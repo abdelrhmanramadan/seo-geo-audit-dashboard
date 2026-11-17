@@ -1,47 +1,304 @@
 {
-  "version": "0.1.0",
-  "sections": [
-    {"id": "setup", "title": "Tools and accounts", "type": "checklist",
-     "help": "Tick what already exists for this site. Anything left unticked goes into month 1 of the plan as a create-and-connect task.",
-     "items": [
-       {"id": "search_console", "label": "Google Search Console", "task": "Create and verify the Search Console domain property, submit the XML sitemap, and grant access to the team"},
-       {"id": "ga4", "label": "Google Analytics 4", "task": "Create the GA4 property, install the tag on every template, and link it to Search Console"},
-       {"id": "gtm", "label": "Google Tag Manager", "task": "Create the GTM container, install it sitewide, and move existing tags into it"},
-       {"id": "conversion_tracking", "label": "Conversion tracking (forms, calls, sales)", "task": "Define the key conversions and track them as GA4 key events through GTM"},
-       {"id": "bing_webmaster", "label": "Bing Webmaster Tools", "task": "Verify the site in Bing Webmaster Tools (import from Search Console) and submit the sitemap"},
-       {"id": "gbp", "label": "Google Business Profile", "task": "Create or claim the Google Business Profile for each location and complete verification", "only_if": {"has_locations": true}},
-       {"id": "merchant_center", "label": "Google Merchant Center", "task": "Create the Merchant Center account, verify the site and submit the product feed", "only_if": {"site_type": "ecommerce"}},
-       {"id": "cms_access", "label": "CMS access for the SEO team", "task": "Get editor/admin access to the CMS for the SEO team"},
-       {"id": "developer", "label": "Developer available for technical changes", "task": "Agree who implements technical fixes and the turnaround time"}
-     ]},
-    {"id": "business", "title": "Business", "fields": [
-       {"id": "site_type", "label": "Site type", "type": "select", "options": [["saas", "SaaS / software"], ["ecommerce", "E-commerce store"], ["services", "Services / lead generation"], ["publisher", "News / publisher"], ["other", "Other / corporate"]]},
-       {"id": "industry", "label": "Industry", "type": "text", "placeholder": "e.g. logistics, fintech, healthcare"},
-       {"id": "site_age", "label": "Site status", "type": "select", "options": [["new", "New site (no SEO work yet)"], ["existing", "Existing site"]]},
-       {"id": "goal", "label": "Primary goal", "type": "select", "options": [["leads", "Leads / demo requests"], ["sales", "Online sales"], ["awareness", "Visibility and brand awareness"]]},
-       {"id": "countries", "label": "Target countries", "type": "text", "placeholder": "e.g. Saudi Arabia, Egypt, UAE"},
-       {"id": "offerings", "label": "Main products or services (one per line)", "type": "textarea"}
-     ]},
-    {"id": "languages", "title": "Languages", "type": "languages",
-     "help": "One row per language version with its URL prefix. Use / for the language at the root, e.g. en at / and ar at /ar."},
-    {"id": "competitors", "title": "Competitors", "fields": [
-       {"id": "competitors", "label": "Competitor domains (3 to 5, one per line)", "type": "textarea"}
-     ]},
-    {"id": "resources", "title": "Resources", "fields": [
-       {"id": "writer", "label": "Who writes the content", "type": "select", "options": [["agency", "Our team"], ["client", "Client's team"], ["mixed", "Both"]]},
-       {"id": "articles_per_month", "label": "Articles per month", "type": "number", "default": 4},
-       {"id": "link_budget", "label": "Link building budget", "type": "select", "options": [["none", "None"], ["low", "Limited"], ["yes", "Dedicated budget"]]}
-     ]},
-    {"id": "history", "title": "History", "fields": [
-       {"id": "previous_seo", "label": "SEO work was done before", "type": "checkbox"},
-       {"id": "migration", "label": "Domain or platform migration in the last 12 months", "type": "checkbox"},
-       {"id": "traffic_drop", "label": "Sudden organic traffic drop happened", "type": "checkbox"},
-       {"id": "redesign_planned", "label": "Redesign or migration planned in the next 12 months", "type": "checkbox"},
-       {"id": "notes", "label": "Notes", "type": "textarea"}
-     ]},
-    {"id": "local", "title": "Local presence", "fields": [
-       {"id": "has_locations", "label": "The business has physical locations or serves specific cities", "type": "checkbox"},
-       {"id": "cities", "label": "Cities / locations", "type": "text"}
-     ]}
-  ]
+ "version": "0.2.0",
+ "sections": [
+  {
+   "id": "setup",
+   "title": "Tools and accounts",
+   "type": "checklist",
+   "help": "Tick what already exists for this site. Anything left unticked goes into month 1 of the plan as a create-and-connect task.",
+   "items": [
+    {
+     "id": "search_console",
+     "label": "Google Search Console",
+     "task": "Create and verify the Search Console domain property, submit the XML sitemap, and grant access to the team"
+    },
+    {
+     "id": "ga4",
+     "label": "Google Analytics 4",
+     "task": "Create the GA4 property, install the tag on every template, and link it to Search Console"
+    },
+    {
+     "id": "gtm",
+     "label": "Google Tag Manager",
+     "task": "Create the GTM container, install it sitewide, and move existing tags into it"
+    },
+    {
+     "id": "conversion_tracking",
+     "label": "Conversion tracking (forms, calls, sales)",
+     "task": "Define the key conversions and track them as GA4 key events through GTM"
+    },
+    {
+     "id": "bing_webmaster",
+     "label": "Bing Webmaster Tools",
+     "task": "Verify the site in Bing Webmaster Tools (import from Search Console) and submit the sitemap"
+    },
+    {
+     "id": "gbp",
+     "label": "Google Business Profile",
+     "task": "Create or claim the Google Business Profile for each location and complete verification",
+     "only_if": {
+      "has_locations": true
+     }
+    },
+    {
+     "id": "merchant_center",
+     "label": "Google Merchant Center",
+     "task": "Create the Merchant Center account, verify the site and submit the product feed",
+     "only_if": {
+      "site_type": "ecommerce"
+     }
+    },
+    {
+     "id": "cms_access",
+     "label": "CMS access for the SEO team",
+     "task": "Get editor/admin access to the CMS for the SEO team"
+    },
+    {
+     "id": "developer",
+     "label": "Developer available for technical changes",
+     "task": "Agree who implements technical fixes and the turnaround time"
+    }
+   ]
+  },
+  {
+   "id": "business",
+   "title": "Business",
+   "fields": [
+    {
+     "id": "site_type",
+     "label": "Site type",
+     "type": "select",
+     "options": [
+      [
+       "saas",
+       "SaaS / software"
+      ],
+      [
+       "ecommerce",
+       "E-commerce store"
+      ],
+      [
+       "services",
+       "Services / lead generation"
+      ],
+      [
+       "publisher",
+       "News / publisher"
+      ],
+      [
+       "other",
+       "Other / corporate"
+      ]
+     ]
+    },
+    {
+     "id": "industry",
+     "label": "Industry",
+     "type": "text",
+     "placeholder": "e.g. logistics, fintech, healthcare"
+    },
+    {
+     "id": "site_age",
+     "label": "Site status",
+     "type": "select",
+     "options": [
+      [
+       "new",
+       "New site (no SEO work yet)"
+      ],
+      [
+       "existing",
+       "Existing site"
+      ]
+     ]
+    },
+    {
+     "id": "goal",
+     "label": "Primary goal",
+     "type": "select",
+     "depends_on": "site_type",
+     "options_by": {
+      "ecommerce": [
+       [
+        "sales",
+        "Online sales and revenue"
+       ],
+       [
+        "product_traffic",
+        "Traffic to product and category pages"
+       ]
+      ],
+      "services": [
+       [
+        "bookings",
+        "Bookings / appointments"
+       ],
+       [
+        "service_requests",
+        "Service or quote requests"
+       ],
+       [
+        "calls",
+        "Phone calls and WhatsApp enquiries"
+       ]
+      ],
+      "saas": [
+       [
+        "demos",
+        "Demo requests / leads"
+       ],
+       [
+        "signups",
+        "Free trial or sign-ups"
+       ]
+      ],
+      "publisher": [
+       [
+        "traffic",
+        "Organic traffic"
+       ],
+       [
+        "subscribers",
+        "Subscribers / newsletter sign-ups"
+       ]
+      ],
+      "other": [
+       [
+        "leads",
+        "Leads / contact requests"
+       ],
+       [
+        "awareness",
+        "Visibility and brand awareness"
+       ]
+      ]
+     }
+    },
+    {
+     "id": "countries",
+     "label": "Target countries",
+     "type": "countries"
+    },
+    {
+     "id": "offerings",
+     "label": "Main products or services (one per line)",
+     "type": "textarea"
+    }
+   ]
+  },
+  {
+   "id": "languages",
+   "title": "Languages",
+   "type": "languages",
+   "help": "The whole site is always crawled. Language versions are detected automatically from the URLs (for example /ar). Add rows only if you want to set them yourself: one row per language with its URL prefix, / for the language at the root."
+  },
+  {
+   "id": "competitors",
+   "title": "Competitors",
+   "fields": [
+    {
+     "id": "competitors",
+     "label": "Competitor domains (3 to 5, one per line)",
+     "type": "textarea"
+    }
+   ]
+  },
+  {
+   "id": "resources",
+   "title": "Resources",
+   "fields": [
+    {
+     "id": "writer",
+     "label": "Who writes the content",
+     "type": "select",
+     "options": [
+      [
+       "agency",
+       "Our team"
+      ],
+      [
+       "client",
+       "Client's team"
+      ],
+      [
+       "mixed",
+       "Both"
+      ]
+     ]
+    },
+    {
+     "id": "articles_per_month",
+     "label": "Articles per month",
+     "type": "number",
+     "default": 4
+    },
+    {
+     "id": "link_budget",
+     "label": "Link building budget",
+     "type": "select",
+     "options": [
+      [
+       "none",
+       "None"
+      ],
+      [
+       "low",
+       "Limited"
+      ],
+      [
+       "yes",
+       "Dedicated budget"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "id": "history",
+   "title": "History",
+   "fields": [
+    {
+     "id": "previous_seo",
+     "label": "SEO work was done before",
+     "type": "checkbox"
+    },
+    {
+     "id": "migration",
+     "label": "Domain or platform migration in the last 12 months",
+     "type": "checkbox"
+    },
+    {
+     "id": "traffic_drop",
+     "label": "Sudden organic traffic drop happened",
+     "type": "checkbox"
+    },
+    {
+     "id": "redesign_planned",
+     "label": "Redesign or migration planned in the next 12 months",
+     "type": "checkbox"
+    },
+    {
+     "id": "notes",
+     "label": "Notes",
+     "type": "textarea"
+    }
+   ]
+  },
+  {
+   "id": "local",
+   "title": "Local presence",
+   "fields": [
+    {
+     "id": "has_locations",
+     "label": "The business has physical locations or serves specific cities",
+     "type": "checkbox"
+    },
+    {
+     "id": "cities",
+     "label": "Cities / locations",
+     "type": "text"
+    }
+   ]
+  }
+ ]
 }

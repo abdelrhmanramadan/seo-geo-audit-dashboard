@@ -2,7 +2,7 @@
 Checks in the catalog with no function here are reported as "not_run" with the reason."""
 import re
 from collections import defaultdict
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
 
 REG = {}
 RTL = {"ar", "he", "fa", "ur"}
@@ -310,8 +310,11 @@ def _(c):
 
 @check("TECH-103")
 def _(c):
-    bad = [it(p["url"], "no Google tag found in HTML") for p in c.html if not p.get("analytics")]
-    return rate(len(c.html), bad, "pages", "analytics tag present")
+    bad = [it(p["url"], "no Google tag found in the HTML source") for p in c.html if not p.get("analytics")]
+    r = rate(len(c.html), bad, "pages", "analytics tag present")
+    if bad:
+        r["summary"] += " (tags injected only after consent or by a script-delay plugin are not visible to the crawler; confirm in the browser)"
+    return r
 
 
 @check("TECH-104")
@@ -438,9 +441,10 @@ def _(c):
     bad = []
     for p in c.html:
         u = urlparse(p["url"])
-        if len(u.path) > 115:
-            bad.append(it(p["url"], f"path is {len(u.path)} characters"))
-        elif "_" in u.path:
+        path = unquote(u.path)
+        if len(path) > 115:
+            bad.append(it(p["url"], f"path is {len(path)} characters"))
+        elif "_" in path:
             bad.append(it(p["url"], "underscores in path"))
         elif re.search(r"(sessionid|sid|phpsessid)=", u.query, re.I):
             bad.append(it(p["url"], "session id in URL"))
@@ -449,7 +453,7 @@ def _(c):
 
 @check("TECH-081")
 def _(c):
-    return rate(len(c.html), [it(p["url"], "uppercase characters in path") for p in c.html if re.search(r"[A-Z]", urlparse(p["url"]).path)], "pages", "lowercase URLs")
+    return rate(len(c.html), [it(p["url"], "uppercase characters in path") for p in c.html if re.search(r"[A-Z]", unquote(urlparse(p["url"]).path))], "pages", "lowercase URLs")
 
 
 # ---------------- On-page: meta ----------------
@@ -590,8 +594,13 @@ def _(c):
 
 @check("CONT-004")
 def _(c):
-    bad = [it(p["url"], f"\"{p['top_term']}\" is {round(p['top_term_share'] * 100, 1)}% of the text") for p in c.indexable if p.get("top_term_share", 0) > 0.03]
-    return rate(len(c.indexable), bad, "indexable pages", "no keyword stuffing")
+    bad = [it(p["url"], f"\"{p['top_term']}\" is {round(p['top_term_share'] * 100, 1)}% of the main text") for p in c.indexable if p.get("top_term_share", 0) > 0.05]
+    r = rate(len(c.indexable), bad, "indexable pages", "no single term above 5% of the text")
+    if r["status"] == "fail":  # density is a signal to review, not proof of stuffing
+        r["status"] = "warn"
+    if bad:
+        r["summary"] += " (one term above 5% of the text; review for unnatural repetition)"
+    return r
 
 
 def posts(c):
@@ -790,7 +799,10 @@ def _(c):
 def _(c):
     st = c.site["probes"]["ai_ua"]
     bad = [it(c.site["start"], f"{b} user agent received {s or 'no response'}") for b, s in st.items() if s != 200]
-    return R("pass" if not bad else "fail", "homepage returns 200 to all AI search user agents" if not bad else f"{len(bad)} AI user agent(s) not served a 200 (homepage only tested)", bad)
+    if not bad:
+        return R("pass", "homepage returns 200 to all AI search user agents")
+    return R("warn", f"{len(bad)} of {len(st)} bot user agents were refused when requested from the audit server. Firewalls often refuse bot user agents "
+             "coming from unverified IPs, so this is not proof that the real bots are blocked: check the CDN/WAF bot settings and server logs for these user agents", bad)
 
 
 @check("GEO-013")

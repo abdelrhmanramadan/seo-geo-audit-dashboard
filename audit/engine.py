@@ -78,7 +78,7 @@ def audit(site, intake):
         subset = [p for p in site["pages"].values() if ctx.lang_of(p["url"])[0] == l["code"]]
         if subset and len(ctx.langs) > 1:
             sc, _, _ = evaluate(site, intake, subset, with_items=False)
-            by_lang[l["code"]] = {"pages": len(subset), "overall": sc["overall"], "pillars": {p["id"]: p["score"] for p in sc["pillars"]}}
+            by_lang[l["code"] or "default (root)"] = {"pages": len(subset), "overall": sc["overall"], "pillars": {p["id"]: p["score"] for p in sc["pillars"]}}
     fails = {}
     for c in checks:
         if c["status"] in ("warn", "fail"):

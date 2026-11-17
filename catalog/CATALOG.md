@@ -703,11 +703,11 @@ Version 0.3.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 - **Test:** Primary topic identifiable from title, H1 and first 100 words; one dominant search intent.
 - **Fix:** State the topic early and remove sections that serve a different intent (move them to their own page).
 
-**CONT-004 · No keyword stuffing**  
-`high` · weight 5 · scope: page · method: crawl · Google official: [Spam policies for Google web search](https://developers.google.com/search/docs/essentials/spam-policies)
+**CONT-004 · Keyword repetition**  
+`medium` · weight 5 · scope: page · method: crawl · Google official: [Spam policies for Google web search](https://developers.google.com/search/docs/essentials/spam-policies)
 
-- **Test:** No single non-stop-word term > 3% of main content; no repeated keyword lists.
-- **Fix:** Rewrite unnaturally repeated phrases; use natural synonyms.
+- **Test:** No single non-stop-word term above 5% of the main content. Reported as a warning to review, since density alone does not prove stuffing.
+- **Fix:** Review the listed pages and rewrite unnaturally repeated phrases; use natural synonyms and remove keyword lists.
 
 **CONT-005 · No scaled low-value content**  
 `high` · weight 6 · scope: language · method: ai · Google official: [Spam policies for Google web search](https://developers.google.com/search/docs/essentials/spam-policies)

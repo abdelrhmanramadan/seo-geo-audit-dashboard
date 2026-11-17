@@ -1142,15 +1142,17 @@ pillars:
         test: Primary topic identifiable from title, H1 and first 100 words; one dominant search intent.
         fix: State the topic early and remove sections that serve a different intent (move them to their own page).
       - id: CONT-004
-        name: No keyword stuffing
+        name: Keyword repetition
         scope: page
         method: crawl
-        severity: high
+        severity: medium
         weight: 5
         basis: google
         source: g_spam
-        test: No single non-stop-word term > 3% of main content; no repeated keyword lists.
-        fix: Rewrite unnaturally repeated phrases; use natural synonyms.
+        test: No single non-stop-word term above 5% of the main content. Reported as a warning to review, since
+          density alone does not prove stuffing.
+        fix: Review the listed pages and rewrite unnaturally repeated phrases; use natural synonyms and remove keyword
+          lists.
       - id: CONT-005
         name: No scaled low-value content
         scope: language

@@ -1,7 +1,28 @@
 """CLI: python -m audit.run --domain example.com --intake intake.json --out out/ [--sf export.csv] [--max-pages 500]"""
-import argparse, json, os, time
+import argparse, json, os, re
+from collections import Counter
+from urllib.parse import urlparse
 from pathlib import Path
 from . import crawl, engine, plan, sf_import
+
+
+KNOWN_LANGS = set("ar en fr de es it pt tr ur fa he ru zh ja ko hi id ms nl sv pl el th vi bn uk ro cs hu da fi no".split())
+
+
+def detect_languages(site):
+    """Language versions from URL prefixes: a first path segment that is a language code and holds at least two pages."""
+    seg = Counter()
+    for p in site["pages"].values():
+        if p.get("html"):
+            m = re.match(r"^/([a-z]{2})(?:-[a-z]{2})?(?:/|$)", urlparse(p["url"]).path.lower())
+            if m and m.group(1) in KNOWN_LANGS:
+                seg[urlparse(p["url"]).path.split("/")[1].lower()] += 1
+    langs = [{"code": s[:2], "prefix": "/" + s} for s, n in seg.items() if n >= 2]
+    home = site["pages"].get(site["fetches"].get(site["start"], {}).get("final", site["start"]), {})
+    root = (home.get("lang") or "")[:2]
+    if root in {l["code"] for l in langs}:
+        root = ""
+    return [{"code": root, "prefix": "/"}] + langs
 
 
 def main():
@@ -16,9 +37,9 @@ def main():
 
     raw = Path(a.intake).read_text(encoding="utf-8") if a.intake else os.environ.get("AUDIT_INTAKE", "{}")
     intake = json.loads(raw or "{}")
-    if not intake.get("languages"):
-        intake["languages"] = [{"code": "", "prefix": "/"}]
     site = crawl.crawl(a.domain, max_pages=a.max_pages)
+    if not intake.get("languages"):
+        intake["languages"], intake["languages_auto"] = detect_languages(site), True
     if a.sf and Path(a.sf).exists():
         print("merged", sf_import.merge(site, a.sf), "pages from the Screaming Frog export")
     result = engine.audit(site, intake)

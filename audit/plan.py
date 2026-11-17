@@ -57,6 +57,11 @@ def build(result, out_path):
     flags = {"multilingual": len(intake.get("languages") or []) > 1, "has_locations": bool(intake.get("has_locations")),
              "site_type": intake.get("site_type") not in (None, "", "other"), "traffic_drop": bool(intake.get("traffic_drop"))}
     n_articles = int(intake.get("articles_per_month") or 4)
+    labels = {}
+    for sec in questions["sections"]:
+        for f in sec.get("fields", []):
+            opts = f.get("options") or [o for v in f.get("options_by", {}).values() for o in v]
+            labels[f["id"]] = next((l for v, l in opts if v == intake.get(f["id"])), "")
     road = []  # month, workstream, task, details, severity, affected, effort, source, check id, reference
 
     # 1. setup items left unticked in the questionnaire
@@ -98,7 +103,8 @@ def build(result, out_path):
     ws.title = "Summary"
     counts = {s: sum(1 for c in findings if c["severity"] == s) for s in SEV}
     lines = [["SEO / GEO / AEO audit and 12-month plan"], [meta["domain"]], [],
-             ["Audit date", meta["crawled_at"][:10]], ["Pages analysed", meta["pages_crawled"]],
+             ["Audit date", meta["crawled_at"][:10]], ["Site type", labels.get("site_type", "")], ["Primary goal", labels.get("goal", "")],
+             ["Target countries", ", ".join(intake.get("countries") or []) if isinstance(intake.get("countries"), list) else intake.get("countries", "")], ["Pages analysed", meta["pages_crawled"]],
              ["Checks run", f"{meta['coverage']['ran']} of {meta['coverage']['applicable']} applicable checks"],
              ["Note", "Scores cover only the checks that ran. Checks listed in 'Manual review' still need to be completed."], [],
              ["Overall score", result["scores"]["overall"]], [], ["Area", "Score (0-100)"]]
@@ -112,7 +118,7 @@ def build(result, out_path):
     for l in lines:
         ws.append(l)
     ws["A1"].font, ws["A2"].font = Font(bold=True, size=16), Font(bold=True, size=13)
-    for r in ws.iter_rows(min_row=9):
+    for r in ws.iter_rows(min_row=9):  # bold the block headings
         if r[0].value in ("Overall score", "Area", "Issues found", "Language"):
             for c in r:
                 c.font = Font(bold=True)
