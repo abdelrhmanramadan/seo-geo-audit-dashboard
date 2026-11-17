@@ -92,5 +92,5 @@ def audit(site, intake):
     cat = load_catalog()
     return {"meta": {"domain": site["host"], "start": site["start"], "crawled_at": site["crawled_at"], "pages_crawled": len(site["pages"]), "truncated": site["truncated"],
                      "catalog_version": cat["version"], "screaming_frog_pages": sum(1 for p in site["pages"].values() if p.get("source") == "screaming_frog"),
-                     "coverage": {"ran": len(ran), "applicable": len(applicable), "total": len(checks)}},
+                     "coverage": {"ran": len(ran), "applicable": len(applicable), "total": len(checks)}, "psi_pages": len(site.get("psi") or {})},
             "scores": scores, "by_language": by_lang, "checks": checks, "pages": pages, "intake": intake}

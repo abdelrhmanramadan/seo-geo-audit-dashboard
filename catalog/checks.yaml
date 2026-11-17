@@ -467,36 +467,38 @@ pillars:
       checks:
       - id: TECH-040
         name: LCP (field data)
-        scope: page
-        method: api:crux
+        scope: site
+        method: api:psi
         severity: high
         weight: 7
         basis: google
         source: g_cwv
-        test: p75 LCP <= 2.5 s pass, <= 4.0 s warn, > 4.0 s fail. Falls back to origin-level data when URL-level
-          is unavailable.
+        test: '75th-percentile LCP from the Chrome UX Report (via PageSpeed Insights) on a sample of pages: up to
+          2.5 s good, up to 4 s needs improvement, above poor. Falls back to origin-level data.'
         fix: 'Report shows the LCP element from Lighthouse. Typical levers: preload/priority-hint the hero image,
           serve AVIF/WebP at the rendered size, cut server TTFB, remove render-blocking CSS/JS.'
       - id: TECH-041
         name: INP (field data)
-        scope: page
-        method: api:crux
+        scope: site
+        method: api:psi
         severity: high
         weight: 7
         basis: google
         source: g_cwv
-        test: p75 INP <= 200 ms pass, <= 500 ms warn, > 500 ms fail.
+        test: '75th-percentile INP from the Chrome UX Report on a sample of pages: up to 200 ms good, up to 500
+          ms needs improvement, above poor.'
         fix: Break up long tasks, defer third-party scripts (chat widgets, tag managers), reduce main-thread JS.
           Report lists the heaviest scripts.
       - id: TECH-042
         name: CLS (field data)
-        scope: page
-        method: api:crux
+        scope: site
+        method: api:psi
         severity: medium
         weight: 6
         basis: google
         source: g_cwv
-        test: p75 CLS <= 0.1 pass, <= 0.25 warn, > 0.25 fail.
+        test: '75th-percentile CLS from the Chrome UX Report on a sample of pages: up to 0.1 good, up to 0.25 needs
+          improvement, above poor.'
         fix: Set width/height on images and embeds, reserve space for banners/cookie bars, use font-display with
           size-adjusted fallbacks.
       - id: TECH-043

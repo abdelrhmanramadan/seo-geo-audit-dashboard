@@ -3,7 +3,7 @@ import argparse, json, os, re
 from collections import Counter
 from urllib.parse import urlparse
 from pathlib import Path
-from . import crawl, engine, plan, sf_import
+from . import crawl, engine, plan, psi, sf_import
 
 
 KNOWN_LANGS = set("ar en fr de es it pt tr ur fa he ru zh ja ko hi id ms nl sv pl el th vi bn uk ro cs hu da fi no".split())
@@ -42,6 +42,7 @@ def main():
         intake["languages"], intake["languages_auto"] = detect_languages(site), True
     if a.sf and Path(a.sf).exists():
         print("merged", sf_import.merge(site, a.sf), "pages from the Screaming Frog export")
+    psi.collect(site)
     result = engine.audit(site, intake)
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)

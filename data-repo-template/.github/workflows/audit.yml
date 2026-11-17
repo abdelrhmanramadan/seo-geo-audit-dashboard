@@ -33,6 +33,7 @@ jobs:
           AUDIT_INTAKE: ${{ inputs.intake }}
           SF_PATH: ${{ inputs.sf_path }}
           MAX_PAGES: ${{ inputs.max_pages }}
+          PSI_API_KEY: ${{ secrets.PSI_API_KEY }}
         run: |
           set -euo pipefail
           HOST=$(python - "$DOMAIN" <<'PY'

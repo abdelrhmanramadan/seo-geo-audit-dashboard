@@ -324,6 +324,52 @@ def _(c):
     return R("pass" if ok else "fail", "Bing verification found" if ok else "no msvalidate.01 meta on the homepage and not confirmed in the questionnaire (DNS/file verification cannot be seen from outside)")
 
 
+# ---------------- Core Web Vitals and lab data (PageSpeed Insights) ----------------
+def _psi(c):
+    if not c.site.get("psi"):
+        return None, {"status": "not_run", "summary": c.site.get("psi_error") or "PageSpeed Insights data was not collected in this run", "items": [], "count": 0}
+    mine = {p["url"] for p in c.html}
+    return {u: v for u, v in c.site["psi"].items() if u in mine} or c.site["psi"], None
+
+
+def _cwv(cid, key, good, poor, unit, label):
+    @check(cid)
+    def _(c):
+        data, miss = _psi(c)
+        if miss:
+            return miss
+        rows = [(u, v) for u, v in data.items() if v.get(key) is not None]
+        if not rows:
+            return R("na", "the Chrome UX Report has no real-user data for this site (not enough Chrome traffic)")
+        fmt = (lambda x: f"{x / 1000:.1f} s") if unit == "s" else (lambda x: f"{x:.0f} ms") if unit == "ms" else (lambda x: f"{x:.2f}")
+        bad = [it(u, f"{label} {fmt(v[key])} at the 75th percentile" + (" (origin-level data)" if v.get("field") == "origin" else "")) for u, v in rows if v[key] > good]
+        worst = max(v[key] for _, v in rows)
+        return R("pass" if not bad else "fail" if worst > poor else "warn", f"{len(bad)} of {len(rows)} sampled pages above Google's 'good' threshold; worst {fmt(worst)}" if bad else f"all {len(rows)} sampled pages are 'good' (worst {fmt(worst)})", bad)
+
+
+_cwv("TECH-040", "lcp_ms", 2500, 4000, "s", "LCP")
+_cwv("TECH-041", "inp_ms", 200, 500, "ms", "INP")
+_cwv("TECH-042", "cls", 0.1, 0.25, "", "CLS")
+
+
+def _lab(cid, key, label):
+    @check(cid)
+    def _(c):
+        data, miss = _psi(c)
+        if miss:
+            return miss
+        rows = [(u, v[key]) for u, v in data.items() if v.get(key) is not None]
+        if not rows:
+            return R("na", "no Lighthouse result returned")
+        bad = [it(u, f"{label} score {s}") for u, s in rows if s < 90]
+        low = min(s for _, s in rows)
+        return R("pass" if not bad else "fail" if low < 50 else "warn", f"{len(bad)} of {len(rows)} sampled pages below 90 (lowest {low}); lab test on mobile" if bad else f"all {len(rows)} sampled pages score 90+", bad)
+
+
+_lab("TECH-043", "lab_performance", "Lighthouse performance")
+_lab("UX-001", "lab_accessibility", "Lighthouse accessibility")
+
+
 # ---------------- Technical: international ----------------
 def pairs(c):
     """slug -> {lang: page} for indexable pages, built from URL prefixes."""

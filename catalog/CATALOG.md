@@ -313,21 +313,21 @@ Version 0.5.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 #### Page experience & Core Web Vitals — 14% of Technical SEO
 
 **TECH-040 · LCP (field data)**  
-`high` · weight 7 · scope: page · method: api:crux · Google official: [Core Web Vitals and Google Search](https://developers.google.com/search/docs/appearance/core-web-vitals)
+`high` · weight 7 · scope: site · method: api:psi · Google official: [Core Web Vitals and Google Search](https://developers.google.com/search/docs/appearance/core-web-vitals)
 
-- **Test:** p75 LCP <= 2.5 s pass, <= 4.0 s warn, > 4.0 s fail. Falls back to origin-level data when URL-level is unavailable.
+- **Test:** 75th-percentile LCP from the Chrome UX Report (via PageSpeed Insights) on a sample of pages: up to 2.5 s good, up to 4 s needs improvement, above poor. Falls back to origin-level data.
 - **Fix:** Report shows the LCP element from Lighthouse. Typical levers: preload/priority-hint the hero image, serve AVIF/WebP at the rendered size, cut server TTFB, remove render-blocking CSS/JS.
 
 **TECH-041 · INP (field data)**  
-`high` · weight 7 · scope: page · method: api:crux · Google official: [Core Web Vitals and Google Search](https://developers.google.com/search/docs/appearance/core-web-vitals)
+`high` · weight 7 · scope: site · method: api:psi · Google official: [Core Web Vitals and Google Search](https://developers.google.com/search/docs/appearance/core-web-vitals)
 
-- **Test:** p75 INP <= 200 ms pass, <= 500 ms warn, > 500 ms fail.
+- **Test:** 75th-percentile INP from the Chrome UX Report on a sample of pages: up to 200 ms good, up to 500 ms needs improvement, above poor.
 - **Fix:** Break up long tasks, defer third-party scripts (chat widgets, tag managers), reduce main-thread JS. Report lists the heaviest scripts.
 
 **TECH-042 · CLS (field data)**  
-`medium` · weight 6 · scope: page · method: api:crux · Google official: [Core Web Vitals and Google Search](https://developers.google.com/search/docs/appearance/core-web-vitals)
+`medium` · weight 6 · scope: site · method: api:psi · Google official: [Core Web Vitals and Google Search](https://developers.google.com/search/docs/appearance/core-web-vitals)
 
-- **Test:** p75 CLS <= 0.1 pass, <= 0.25 warn, > 0.25 fail.
+- **Test:** 75th-percentile CLS from the Chrome UX Report on a sample of pages: up to 0.1 good, up to 0.25 needs improvement, above poor.
 - **Fix:** Set width/height on images and embeds, reserve space for banners/cookie bars, use font-display with size-adjusted fallbacks.
 
 **TECH-043 · Lighthouse performance (lab, mobile)**  
