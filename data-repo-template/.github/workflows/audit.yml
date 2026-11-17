@@ -1,0 +1,58 @@
+# Copy this file to .github/workflows/audit.yml in the PRIVATE data repository.
+# It runs the audit code from the public repository and stores results here, so client data stays private.
+name: Run audit
+on:
+  workflow_dispatch:
+    inputs:
+      domain: {description: "Domain or start URL", required: true}
+      intake: {description: "Questionnaire answers (JSON)", required: false, default: "{}"}
+      sf_path: {description: "Path in this repo to a Screaming Frog CSV (uploads/...)", required: false, default: ""}
+      max_pages: {description: "Maximum pages to crawl", required: false, default: "500"}
+permissions:
+  contents: write
+concurrency:
+  group: audit
+  cancel-in-progress: false
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: abdelrhmanramadan/seo-geo-audit-dashboard
+          path: _tool
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r _tool/requirements.txt
+      - name: Run audit
+        env:
+          DOMAIN: ${{ inputs.domain }}
+          AUDIT_INTAKE: ${{ inputs.intake }}
+          SF_PATH: ${{ inputs.sf_path }}
+          MAX_PAGES: ${{ inputs.max_pages }}
+        run: |
+          set -euo pipefail
+          HOST=$(python - "$DOMAIN" <<'PY'
+          import re, sys
+          from urllib.parse import urlparse
+          d = sys.argv[1].strip()
+          h = urlparse(d if "://" in d else "https://" + d).netloc.lower()
+          h = re.sub(r"[^a-z0-9.-]", "", h[4:] if h.startswith("www.") else h)
+          sys.exit("invalid domain") if not h or ".." in h else print(h)
+          PY
+          )
+          STAMP=$(date -u +%Y%m%d-%H%M%S)
+          ARGS=(--domain "$DOMAIN" --max-pages "$((MAX_PAGES + 0))" --out "audits/$HOST/$STAMP" --index audits/index.json)
+          if [[ "$SF_PATH" == uploads/* && "$SF_PATH" != *..* && -f "$SF_PATH" ]]; then ARGS+=(--sf "$SF_PATH"); fi
+          PYTHONPATH=_tool python -m audit.run "${ARGS[@]}"
+      - name: Save results
+        run: |
+          git config user.name "audit-bot"
+          git config user.email "audit-bot@users.noreply.github.com"
+          git add audits
+          git commit -m "Audit results" || exit 0
+          git pull --rebase
+          git push

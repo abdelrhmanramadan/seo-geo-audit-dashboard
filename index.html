@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>SEO / GEO / AEO Audit Dashboard</title>
+<style>
+:root{--ink:#16233a;--mut:#5d6b82;--line:#dfe5ee;--bg:#f5f7fa;--card:#fff;--acc:#1f4f99;--good:#1a7f4b;--warn:#b26a00;--bad:#b3261e}
+*{box-sizing:border-box}body{margin:0;font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:var(--ink);color:#fff;padding:14px 24px;display:flex;gap:24px;align-items:center;flex-wrap:wrap}
+header h1{font-size:17px;margin:0;font-weight:600}nav{display:flex;gap:4px}
+nav button{background:none;border:0;color:#c6d0e0;padding:8px 14px;border-radius:6px;font:inherit;cursor:pointer}
+nav button.on{background:#2b3d5c;color:#fff}main{max-width:1180px;margin:0 auto;padding:24px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px;margin-bottom:18px}
+h2{font-size:18px;margin:0 0 12px}h3{font-size:15px;margin:18px 0 8px}
+label{display:block;font-weight:600;margin:12px 0 4px;font-size:14px}.help{color:var(--mut);font-size:13px;margin:0 0 8px}
+input[type=text],input[type=number],input[type=password],select,textarea{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:6px;font:inherit;background:#fff}
+textarea{min-height:76px}.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.chk{display:flex;gap:8px;align-items:center;font-weight:400;margin:6px 0}.chk input{width:17px;height:17px}
+button.pri{background:var(--acc);color:#fff;border:0;padding:10px 18px;border-radius:6px;font:inherit;font-weight:600;cursor:pointer}
+button.sec{background:#fff;color:var(--acc);border:1px solid var(--acc);padding:8px 14px;border-radius:6px;font:inherit;cursor:pointer}
+button:disabled{opacity:.5;cursor:default}.msg{padding:10px 12px;border-radius:6px;margin:12px 0;background:#eaf1fb}.msg.err{background:#fdecea;color:var(--bad)}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}tr.click{cursor:pointer}tr.click:hover{background:#f0f4fa}
+.score{font-weight:700}.s-good{color:var(--good)}.s-mid{color:var(--warn)}.s-bad{color:var(--bad)}.s-na{color:var(--mut)}
+.big{font-size:44px;line-height:1}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:3px}.bar i{display:block;height:100%}
+.sub{display:flex;justify-content:space-between;gap:8px;font-size:13px;margin-top:8px}.sub span:last-child{white-space:nowrap}
+.tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;font-weight:600}
+.t-critical{background:#f9d6d2;color:#8c1d18}.t-high{background:#fde3c8;color:#8a4b00}.t-medium{background:#fff1c2;color:#6b5200}.t-low{background:#dbe9f9;color:#1f4f99}.t-info{background:#e8ebf0;color:#48566b}
+.t-fail{background:#f9d6d2;color:#8c1d18}.t-warn{background:#fff1c2;color:#6b5200}.t-pass{background:#d5efdf;color:#12613a}.t-not_run,.t-na,.t-error{background:#e8ebf0;color:#48566b}
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}.filters select{width:auto}
+details{border-bottom:1px solid var(--line);padding:9px 2px}summary{cursor:pointer;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+summary b{font-weight:600}.det{padding:10px 0 4px 4px;font-size:14px}.det p{margin:6px 0}.urls{max-height:260px;overflow:auto;background:var(--bg);border-radius:6px;padding:8px;font-size:13px}
+.urls div{padding:3px 0;border-bottom:1px solid var(--line);word-break:break-all}.mut{color:var(--mut)}a{color:var(--acc)}
+.langrow{display:flex;gap:8px;margin-bottom:6px}.langrow input{flex:1}
+</style>
+</head>
+<body>
+<header><h1>SEO / GEO / AEO Audit Dashboard</h1>
+<nav><button data-v="audits" class="on">Audits</button><button data-v="new">New audit</button><button data-v="settings">Settings</button></nav></header>
+<main id="app"></main>
+<script>
+"use strict";
+const $ = (tag, attrs = {}, ...kids) => {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") e.className = v; else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else if (v === true) e.setAttribute(k, ""); else if (v !== false && v != null) e.setAttribute(k, v);
+  }
+  for (const k of kids.flat()) if (k != null && k !== false) e.append(k.nodeType ? k : document.createTextNode(String(k)));
+  return e;
+};
+const store = { get(k) { try { return localStorage.getItem(k) || ""; } catch { return ""; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+const cfg = () => ({ repo: store.get("dataRepo").trim(), token: store.get("token").trim() });
+const app = document.getElementById("app");
+let questions = null;
+
+async function gh(path, opts = {}) {
+  const { repo, token } = cfg();
+  if (!repo || !token) throw new Error("Add the data repository and token in Settings first.");
+  const r = await fetch(`https://api.github.com/repos/${repo}/${path}`, { ...opts, headers: { Authorization: `Bearer ${token}`, Accept: opts.accept || "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", ...(opts.headers || {}) } });
+  if (r.status === 404) throw Object.assign(new Error("Not found: " + path), { status: 404 });
+  if (!r.ok) throw new Error(`GitHub ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  return r;
+}
+const raw = (p) => gh("contents/" + p.split("/").map(encodeURIComponent).join("/"), { accept: "application/vnd.github.raw+json" });
+const cls = (s) => s == null ? "s-na" : s >= 80 ? "s-good" : s >= 50 ? "s-mid" : "s-bad";
+const col = (s) => s == null ? "#b9c2d0" : s >= 80 ? "#1a7f4b" : s >= 50 ? "#d08a00" : "#b3261e";
+const fmt = (s) => s == null ? "n/a" : Math.round(s);
+const msg = (t, err) => $("div", { class: "msg" + (err ? " err" : "") }, t);
+
+function show(view, arg) {
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.dataset.v === view));
+  app.replaceChildren();
+  ({ audits: viewAudits, new: viewNew, settings: viewSettings, result: viewResult })[view](arg).catch(e => app.append(msg(e.message, true)));
+}
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => show(b.dataset.v));
+
+async function viewSettings() {
+  const repo = $("input", { type: "text", value: store.get("dataRepo"), placeholder: "owner/seo-audit-data" });
+  const tok = $("input", { type: "password", value: store.get("token"), placeholder: "github_pat_..." });
+  const note = $("div");
+  app.append($("div", { class: "card" }, $("h2", {}, "Settings"),
+    $("p", { class: "help" }, "Audits run in your private data repository and results are read from it. The token is kept only in this browser and is sent only to api.github.com."),
+    $("label", {}, "Private data repository"), repo,
+    $("label", {}, "Fine-grained access token"), tok,
+    $("p", { class: "help" }, "Token scope: only the data repository, with Contents (read and write) and Actions (read and write)."),
+    $("button", { class: "pri", onclick: async () => {
+      store.set("dataRepo", repo.value); store.set("token", tok.value);
+      try { await gh(""); note.replaceChildren(msg("Saved. Connection to the repository works.")); } catch (e) { note.replaceChildren(msg("Saved, but the connection failed: " + e.message, true)); }
+    } }, "Save and test"), note));
+}
+
+async function viewAudits() {
+  const card = $("div", { class: "card" }, $("h2", {}, "Audits"));
+  app.append(card);
+  let idx;
+  try { idx = await (await raw("audits/index.json")).json(); }
+  catch (e) { card.append(e.status === 404 ? $("p", { class: "mut" }, "No audits yet. Start one from New audit.") : msg(e.message, true)); return; }
+  const t = $("table", {}, $("tr", {}, ...["Domain", "Date", "Pages", "Overall", "SEO", "GEO", "AEO", "Local"].map(h => $("th", {}, h))));
+  for (const a of idx) {
+    const sc = (v) => $("td", { class: "score " + cls(v) }, fmt(v));
+    t.append($("tr", { class: "click", onclick: () => show("result", a) }, $("td", {}, a.domain), $("td", {}, a.date.slice(0, 16).replace("T", " ")), $("td", {}, a.pages),
+      sc(a.overall), sc(a.pillars.seo), sc(a.pillars.geo), sc(a.pillars.aeo), sc(a.pillars.local)));
+  }
+  card.append(t);
+}
+
+function field(f, state) {
+  const set = (v) => { state[f.id] = v; };
+  if (f.type === "checkbox") { set(false); return $("label", { class: "chk" }, $("input", { type: "checkbox", onchange: e => set(e.target.checked) }), f.label); }
+  let input;
+  if (f.type === "select") { input = $("select", { onchange: e => set(e.target.value) }, ...f.options.map(([v, l]) => $("option", { value: v }, l))); set(f.options[0][0]); }
+  else if (f.type === "textarea") input = $("textarea", { oninput: e => set(e.target.value) });
+  else { input = $("input", { type: f.type === "number" ? "number" : "text", placeholder: f.placeholder || "", value: f.default ?? "", oninput: e => set(f.type === "number" ? Number(e.target.value) : e.target.value) }); if (f.default != null) set(f.default); }
+  return $("div", {}, $("label", {}, f.label), input);
+}
+
+async function viewNew() {
+  if (!questions) questions = await (await fetch("intake/questions.json")).json();
+  const st = { setup: {} }, langs = [];
+  const domain = $("input", { type: "text", placeholder: "example.com" });
+  const maxp = $("input", { type: "number", value: 500, min: 10, max: 5000 });
+  const sf = $("input", { type: "file", accept: ".csv" });
+  const form = $("div", { class: "card" }, $("h2", {}, "New audit"),
+    $("div", { class: "row" }, $("div", {}, $("label", {}, "Domain"), domain), $("div", {}, $("label", {}, "Maximum pages to crawl"), maxp)));
+  const langBox = $("div");
+  const addLang = (code = "", prefix = "") => {
+    const o = { code, prefix }; langs.push(o);
+    langBox.append($("div", { class: "langrow" }, $("input", { type: "text", placeholder: "Language code, e.g. en", value: code, oninput: e => o.code = e.target.value.trim().toLowerCase() }),
+      $("input", { type: "text", placeholder: "URL prefix, e.g. / or /ar", value: prefix, oninput: e => o.prefix = e.target.value.trim() })));
+  };
+  const setupItems = [];
+  for (const s of questions.sections) {
+    form.append($("h3", {}, s.title));
+    if (s.help) form.append($("p", { class: "help" }, s.help));
+    if (s.type === "checklist") for (const i of s.items) {
+      const el = $("label", { class: "chk" }, $("input", { type: "checkbox", onchange: e => st.setup[i.id] = e.target.checked }), i.label);
+      setupItems.push([i, el]); form.append(el);
+    } else if (s.type === "languages") { form.append(langBox, $("button", { class: "sec", onclick: () => addLang() }, "Add language")); addLang("en", "/"); }
+    else form.append($("div", { class: "row" }, ...s.fields.map(f => { const el = field(f, st); el.addEventListener("change", refresh); return el; })));
+  }
+  function refresh() { for (const [i, el] of setupItems) el.style.display = Object.entries(i.only_if || {}).every(([k, v]) => st[k] === v) ? "" : "none"; }
+  refresh();
+  const note = $("div");
+  const go = $("button", { class: "pri", onclick: run }, "Start audit");
+  form.append($("h3", {}, "Screaming Frog export (optional)"),
+    $("p", { class: "help" }, "In Screaming Frog: Internal tab > Filter: All > Export, as CSV. Pages the built-in crawler does not reach are added from this file. Maximum 25 MB."), sf,
+    $("div", { style: "margin-top:18px" }, go), note);
+  app.append(form);
+
+  async function run() {
+    try {
+      const d = domain.value.trim();
+      if (!/^(https?:\/\/)?[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(d)) throw new Error("Enter a valid domain.");
+      go.disabled = true; note.replaceChildren(msg("Starting..."));
+      const intake = { ...st, languages: langs.filter(l => l.prefix).map(l => ({ code: l.code, prefix: l.prefix.startsWith("/") ? l.prefix : "/" + l.prefix })),
+        competitors: (st.competitors || "").split("\n").map(s => s.trim()).filter(Boolean) };
+      let sfPath = "";
+      if (sf.files[0]) {
+        if (sf.files[0].size > 25e6) throw new Error("The Screaming Frog file is larger than 25 MB.");
+        const b64 = await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(String(fr.result).split(",")[1]); fr.onerror = no; fr.readAsDataURL(sf.files[0]); });
+        sfPath = `uploads/${d.replace(/^https?:\/\//, "").replace(/[^a-z0-9.-]/gi, "_")}-${Date.now()}.csv`;
+        await gh("contents/" + sfPath, { method: "PUT", body: JSON.stringify({ message: "Screaming Frog export", content: b64 }) });
+      }
+      await gh("actions/workflows/audit.yml/dispatches", { method: "POST", body: JSON.stringify({ ref: "main", inputs: { domain: d, intake: JSON.stringify(intake), sf_path: sfPath, max_pages: String(maxp.value || 500) } }) });
+      note.replaceChildren(msg("Audit started. It usually takes 3 to 15 minutes depending on site size. It will appear under Audits when finished."),
+        $("a", { href: `https://github.com/${cfg().repo}/actions`, target: "_blank", rel: "noopener" }, "Follow the run on GitHub"));
+    } catch (e) { note.replaceChildren(msg(e.message, true)); }
+    go.disabled = false;
+  }
+}
+
+async function viewResult(a) {
+  app.append(msg("Loading " + a.domain + "..."));
+  const r = await (await raw(a.path + "/result.json")).json();
+  app.replaceChildren();
+  const m = r.meta, cov = m.coverage;
+  const dl = $("button", { class: "pri", onclick: async () => {
+    const blob = await (await raw(a.path + "/plan.xlsx")).blob();
+    const u = URL.createObjectURL(blob); const l = $("a", { href: u, download: `${m.domain}-seo-plan-${m.crawled_at.slice(0, 10)}.xlsx` }); document.body.append(l); l.click(); l.remove(); URL.revokeObjectURL(u);
+  } }, "Download 12-month plan (.xlsx)");
+  app.append($("div", { class: "card" }, $("div", { style: "display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:flex-start" },
+    $("div", {}, $("h2", {}, m.domain), $("div", { class: "mut" }, `${m.crawled_at.slice(0, 16).replace("T", " ")} UTC · ${m.pages_crawled} pages` + (m.screaming_frog_pages ? ` (${m.screaming_frog_pages} from Screaming Frog)` : "") + (m.truncated ? " · crawl limit reached" : "")),
+      $("div", { class: "mut" }, `${cov.ran} of ${cov.applicable} applicable checks ran automatically. Scores cover only those; the rest are listed as Not run.`)),
+    $("div", { style: "text-align:right" }, $("div", { class: "big score " + cls(r.scores.overall) }, fmt(r.scores.overall)), $("div", { class: "mut" }, "overall score"), $("div", { style: "margin-top:10px" }, dl)))));
+
+  const grid = $("div", { class: "grid" });
+  for (const p of r.scores.pillars) {
+    if (p.score == null && !p.sections.some(s => s.active)) continue;
+    const c = $("div", { class: "card", style: "margin:0" }, $("div", { style: "display:flex;justify-content:space-between" }, $("b", {}, p.name), $("span", { class: "score " + cls(p.score) }, fmt(p.score))));
+    for (const s of p.sections.filter(s => s.active)) {
+      c.append($("div", { class: "sub", style: "font-weight:600" }, $("span", {}, s.name), $("span", { class: cls(s.score) }, fmt(s.score))));
+      for (const ss of s.subsections) c.append($("div", { class: "sub" }, $("span", {}, ss.name), $("span", { class: "mut" }, `${fmt(ss.score)} · ${ss.ran}/${ss.total}`)),
+        $("div", { class: "bar" }, $("i", { style: `width:${ss.score ?? 0}%;background:${col(ss.score)}` })));
+    }
+    grid.append(c);
+  }
+  app.append(grid);
+  const langs = Object.entries(r.by_language || {});
+  if (langs.length) app.append($("div", { class: "card", style: "margin-top:18px" }, $("h2", {}, "By language"),
+    $("table", {}, $("tr", {}, ...["Language", "Pages", "Overall", "SEO", "GEO", "AEO"].map(h => $("th", {}, h))),
+      ...langs.map(([k, v]) => $("tr", {}, $("td", {}, k), $("td", {}, v.pages), ...[v.overall, v.pillars.seo, v.pillars.geo, v.pillars.aeo].map(x => $("td", { class: "score " + cls(x) }, fmt(x))))))));
+
+  try {
+    const ah = await (await raw(`audits/${m.domain}/ahrefs.json`)).json();
+    app.append($("div", { class: "card", style: "margin-top:18px" }, $("h2", {}, "Ahrefs snapshot"), $("div", { class: "mut" }, "Updated " + (ah.updated || "")),
+      $("div", { class: "grid", style: "margin-top:10px" }, ...Object.entries(ah.metrics || {}).map(([k, v]) => $("div", {}, $("div", { class: "mut" }, k), $("div", { style: "font-size:22px;font-weight:700" }, v))))));
+  } catch {}
+
+  const order = { critical: 0, high: 1, medium: 2, low: 3, info: 4 }, sorder = { fail: 0, warn: 1, error: 2, not_run: 3, info: 4, pass: 5, na: 6 };
+  const sel = (opts) => $("select", { onchange: draw }, ...opts.map(([v, l]) => $("option", { value: v }, l)));
+  const fStatus = sel([["issues", "Issues (fail + warn)"], ["fail", "Fail"], ["warn", "Warn"], ["pass", "Pass"], ["not_run", "Not run"], ["all", "All"]]);
+  const fSev = sel([["", "All severities"], ["critical", "Critical"], ["high", "High"], ["medium", "Medium"], ["low", "Low"]]);
+  const fPil = sel([["", "All areas"], ...r.scores.pillars.map(p => [p.id, p.name])]);
+  const list = $("div"), count = $("span", { class: "mut" });
+  app.append($("div", { class: "card", style: "margin-top:18px" }, $("h2", {}, "Checks"), $("div", { class: "filters" }, fStatus, fSev, fPil, count), list));
+  function draw() {
+    const rows = r.checks.filter(c => c.status !== "na" && (fStatus.value === "all" || (fStatus.value === "issues" ? ["fail", "warn"].includes(c.status) : c.status === fStatus.value)) && (!fSev.value || c.severity === fSev.value) && (!fPil.value || c.pillar === fPil.value))
+      .sort((x, y) => sorder[x.status] - sorder[y.status] || order[x.severity] - order[y.severity]);
+    count.textContent = rows.length + " checks";
+    list.replaceChildren(...rows.map(c => $("details", {}, $("summary", {}, $("span", { class: "tag t-" + c.status }, c.status.replace("_", " ")), $("span", { class: "tag t-" + c.severity }, c.severity), $("b", {}, c.name), $("span", { class: "mut" }, c.id + " · " + c.section_name + " / " + c.subsection_name)),
+      $("div", { class: "det" }, $("p", {}, $("b", {}, "Found: "), c.summary), $("p", {}, $("b", {}, "Rule: "), c.test), $("p", {}, $("b", {}, "Fix: "), c.fix),
+        $("p", { class: "mut" }, ({ google: "Google official", platform: "Platform official", industry: "Industry practice" })[c.basis] + ": ", $("a", { href: c.source_url, target: "_blank", rel: "noopener" }, c.source_title)),
+        c.items.length ? $("div", { class: "urls" }, ...c.items.map(i => $("div", {}, i.url, i.detail ? $("span", { class: "mut" }, " — " + i.detail) : null)), c.count > c.items.length ? $("div", { class: "mut" }, `and ${c.count - c.items.length} more`) : null) : null))));
+  }
+  draw();
+}
+show("audits");
+</script>
+</body>
+</html>

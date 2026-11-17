@@ -1,0 +1,498 @@
+# Client plan template
+# The dashboard's "Generate plan" action builds a client-ready workbook (.xlsx, opens in Google Sheets)
+# from two inputs:
+#   1. audit findings  -> every failed/warned check becomes a task in its workstream, with affected URLs
+#   2. baseline tasks  -> work that no audit can detect (keyword research, content, link building...),
+#                         always included for a new site, optional for an existing one
+#
+# source_checks: check-id prefixes or ids from catalog/checks.yaml whose findings land in the workstream
+# needs:         data the workstream depends on; shown in the plan as a prerequisite when not connected
+
+version: 0.2.0
+task_columns:
+- Workstream
+- Sub-area
+- Task
+- What was found
+- Affected URLs
+- Severity
+- Impact
+- Effort
+- Phase
+- Owner
+- Status
+- Tools
+- Check ID
+- Google reference
+severity_order:
+- Critical
+- High
+- Medium
+- Low
+effort_levels:
+  S: under 2 hours
+  M: up to 2 days
+  L: more than 2 days
+phases:
+- id: P0
+  name: Foundation and blockers
+  months:
+  - 1
+  takes: setup, Critical findings, keyword research
+- id: P1
+  name: Fix and optimise
+  months:
+  - 2
+  - 3
+  takes: High findings, technical and on-page
+- id: P2
+  name: Build
+  months:
+  - 4
+  - 5
+  - 6
+  takes: Medium findings, entity, AI visibility, link building start
+- id: P3
+  name: Scale and maintain
+  months:
+  - 7
+  - 8
+  - 9
+  - 10
+  - 11
+  - 12
+  takes: Low findings, refresh, expansion, quarterly reviews
+workbook_tabs:
+- name: Summary
+  content: scores per pillar and section, issue counts by severity, top 10 priorities, scope and date of the audit
+- name: Roadmap
+  content: all tasks grouped by phase, then workstream
+- name: Issues
+  content: every finding sorted Critical > High > Medium > Low, with affected URLs and fix
+- name: Quick wins
+  content: tasks with Effort S and Impact high
+- name: Keyword research
+  content: seed topics, keyword map per page, gaps; filled with volumes when a keyword data source is connected
+- name: Content plan
+  content: pages to create, optimise, refresh or merge, each with target topic and brief status
+- name: Link building
+  content: tactics, targets and outreach list
+- name: KPIs
+  content: 'baseline and targets: indexed pages, organic clicks, conversions, AI citations, score per pillar'
+- name: URL details
+  content: one row per crawled URL with its failing checks
+workstreams:
+- id: keyword_research
+  name: Keyword Research
+  sub_areas:
+  - Long-tail keywords
+  - Low-competition keywords
+  - Keyword gap analysis
+  - SERP analysis
+  - Keyword-to-page mapping
+  source_checks:
+  - CONT-010
+  - CONT-011
+  - AEO-010
+  needs:
+  - keyword data source (Search Console for existing sites; paid API for volumes and difficulty)
+  baseline_tasks:
+  - task: Define seed topics from products/services, audience and competitors
+    months:
+    - 1
+  - task: Build the long-tail and low-competition keyword list per topic
+    months:
+    - 1
+  - task: Run keyword gap analysis against the competitors set in the project
+    months:
+    - 1
+  - task: Review the SERP for each priority keyword (intent, page types ranking, SERP features)
+    months:
+    - 2
+  - task: Map one primary topic per page and resolve cannibalisation
+    months:
+    - 2
+  - task: Refresh keyword research with new Search Console queries
+    months:
+    - 6
+    - 12
+- id: technical
+  name: Technical SEO
+  sub_areas:
+  - Crawling
+  - Indexing
+  - robots.txt
+  - Sitemaps
+  - Canonical tags
+  - Redirects
+  - HTTPS and security
+  - Page speed and Core Web Vitals
+  - JavaScript rendering
+  - Mobile
+  - URL structure
+  - Server and delivery
+  - Log file analysis
+  source_checks:
+  - TECH-00
+  - TECH-01
+  - TECH-02
+  - TECH-03
+  - TECH-04
+  - TECH-05
+  - TECH-06
+  - TECH-08
+  - TECH-09
+  needs:
+  - server logs upload for log file analysis (optional)
+  baseline_tasks:
+  - task: Submit the XML sitemap in Search Console and Bing Webmaster Tools
+    months:
+    - 1
+  - task: Analyse server logs for crawl waste and uncrawled pages (if logs are available)
+    months:
+    - 3
+  - task: Re-crawl and verify that technical fixes are live
+    months:
+    - 3
+    - 6
+    - 9
+    - 12
+- id: international
+  name: International SEO
+  sub_areas:
+  - Multilingual SEO
+  - hreflang
+  - Country targeting
+  - Translation quality
+  - Language switcher
+  source_checks:
+  - TECH-07
+  - META-007
+  - META-013
+  - GEO-010
+  - LOC-012
+  baseline_tasks:
+  - task: Confirm the URL structure and hreflang setup for every language/country
+    months:
+    - 2
+    when: multilingual
+  - task: Localise keyword research per market instead of translating keywords
+    months:
+    - 2
+    when: multilingual
+- id: onpage
+  name: On-page SEO
+  sub_areas:
+  - Titles
+  - Meta descriptions and CTR
+  - Headings
+  - Image SEO
+  - Internal linking
+  - Schema markup
+  - Social tags
+  source_checks:
+  - META-
+  - HEAD-
+  - IMG-
+  - LINK-
+  - SD-
+  - UX-
+  needs:
+  - Search Console for CTR analysis
+  baseline_tasks:
+  - task: Rewrite titles and descriptions of pages with high impressions and low CTR (Search Console)
+    months:
+    - 3
+    - 6
+    - 9
+    - 12
+  - task: Template schema markup per page type in the CMS
+    months:
+    - 3
+- id: content
+  name: Content SEO
+  sub_areas:
+  - Research
+  - Briefs
+  - Content writing
+  - Content optimisation
+  - Content refresh
+  - Expansion
+  - Blog structure
+  source_checks:
+  - CONT-
+  - BLOG-
+  - GEO-04
+  - AEO-00
+  - AEO-01
+  baseline_tasks:
+  - task: Build the topic cluster map (pillar pages and supporting articles)
+    months:
+    - 2
+  - task: Agree the content brief template (intent, questions, sources, internal links)
+    months:
+    - 2
+  - task: Write briefs for the month's articles
+    months:
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+  - task: Publish {n} articles
+    months:
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+  - task: Optimise existing pages against their mapped topics
+    months:
+    - 3
+    - 4
+    - 5
+  - task: Refresh the oldest and declining pages
+    months:
+    - 7
+    - 9
+    - 11
+  - task: Expand into adjacent topics once core clusters are covered
+    months:
+    - 10
+- id: site_type
+  name: Site-type pages
+  sub_areas:
+  - E-commerce
+  - News and publishers
+  - 'SaaS: programmatic, comparison, alternatives, integration, feature pages, free tools'
+  - Services and lead generation
+  source_checks:
+  - ECOM-
+  - NEWS-
+  - SAAS-
+  - SERV-
+  baseline_tasks:
+  - task: List the page types this site type needs and create the missing ones
+    months:
+    - 3
+    - 4
+    when: site_type
+- id: ai_search
+  name: AI SEO (GEO)
+  sub_areas:
+  - AI crawler access
+  - AI search visibility
+  - ChatGPT
+  - Google AI Mode and AI Overviews
+  - Gemini
+  - Claude
+  - Perplexity
+  - Brand mentions
+  - AI citations
+  - Entity and E-E-A-T
+  - Off-site presence
+  source_checks:
+  - GEO-
+  - AEO-02
+  needs:
+  - prompt set per project and an AI engine connection for visibility measurement
+  baseline_tasks:
+  - task: Define the AI prompt set to track per language (category, comparison, problem prompts)
+    months:
+    - 3
+  - task: Record the baseline of brand mentions and citations per AI engine
+    months:
+    - 3
+  - task: Review AI visibility and update priority pages
+    months:
+    - 6
+    - 9
+    - 12
+- id: answer_engine
+  name: AEO
+  sub_areas:
+  - Answer formats
+  - Question coverage
+  - Featured snippets
+  - People Also Ask
+  source_checks:
+  - AEO-
+  baseline_tasks:
+  - task: Add direct-answer blocks and FAQs to priority pages
+    months:
+    - 4
+    - 5
+- id: local
+  name: Local SEO
+  sub_areas:
+  - Google Business Profile
+  - NAP consistency
+  - Local schema
+  - Location pages
+  - Citations and other maps
+  - Reviews
+  source_checks:
+  - LOC-
+  baseline_tasks:
+  - task: Review the Google Business Profile against the manual checklist and fix the gaps
+    months:
+    - 2
+    when: has_locations
+  - task: Request reviews from recent customers and reply to all reviews
+    months:
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    when: has_locations
+- id: link_building
+  name: Link Building
+  sub_areas:
+  - Digital PR
+  - Linkable assets
+  - Broken link building
+  - Resource page links
+  - Unlinked brand mentions
+  - Journalist requests (HARO and similar)
+  - Expert contributions on other sites
+  source_checks:
+  - OFF-
+  - GEO-06
+  needs:
+  - backlink data source for competitor gap and anchors
+  baseline_tasks:
+  - task: Create one linkable asset (data study, tool, template)
+    months:
+    - 4
+    - 8
+  - task: Reclaim unlinked brand mentions and links to broken pages
+    months:
+    - 4
+  - task: Build the prospect list from the competitor link gap
+    months:
+    - 4
+  - task: Run outreach and digital PR for the month
+    months:
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+  policy_note: Paid links, link exchanges and large-scale guest posting with keyword anchors violate Google's spam policies.
+    Contributions on other sites are planned for audience and authority, with sponsored links qualified.
+- id: analytics
+  name: SEO Analytics and Reporting
+  sub_areas:
+  - Search Console
+  - Google Analytics
+  - Bing Webmaster Tools
+  - Conversion tracking
+  - Revenue attribution
+  - SEO reporting
+  source_checks:
+  - TECH-10
+  baseline_tasks:
+  - task: Agree KPIs, baseline and reporting format
+    months:
+    - 1
+  - task: Create an AI-referral channel group in GA4
+    months:
+    - 1
+  - task: Monthly SEO report
+    months:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+- id: penalties
+  name: Penalties and Risk
+  sub_areas:
+  - Manual actions
+  - Spam policy compliance
+  - Algorithm update impact
+  - Recovery
+  source_checks:
+  - TECH-101
+  - TECH-063
+  - TECH-064
+  - CONT-004
+  - CONT-005
+  - CONT-012
+  - OFF-005
+  - SD-008
+  needs:
+  - Search Console for manual actions and traffic history
+  baseline_tasks:
+  - task: Check the Manual actions and Security issues reports in Search Console
+    months:
+    - 1
+  - task: Compare traffic history with confirmed Google update dates
+    months:
+    - 1
+    when: traffic_drop
+- id: automation
+  name: Automation and Monitoring
+  sub_areas:
+  - Scheduled audits
+  - Change monitoring
+  - Schema generation
+  - Reporting workflows
+  baseline_tasks:
+  - task: Schedule the recurring audit for this domain
+    months:
+    - 2
+  - task: Quarterly full re-audit and roadmap review
+    months:
+    - 3
+    - 6
+    - 9
+    - 12
+- id: growth
+  name: Growth and Conversion
+  sub_areas:
+  - Organic traffic targets
+  - Conversion optimisation
+  - Revenue growth
+  - Scaling
+  source_checks:
+  - UX-002
+  - SERV-005
+  baseline_tasks:
+  - task: Set 3, 6 and 12 month targets from the baseline
+    months:
+    - 1
+  - task: Review conversion paths on the top organic landing pages
+    months:
+    - 6
+    - 12
+task_tools_column: 'Per task, names the tool that does it: this dashboard, Search Console, GA4, PageSpeed Insights, and optionally
+  Ahrefs, Semrush, Screaming Frog or a content optimisation tool when the client has them.'

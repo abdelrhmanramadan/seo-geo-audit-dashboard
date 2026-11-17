@@ -1,0 +1,3643 @@
+# SEO / GEO / AEO / Local SEO Audit — Checks Catalog
+# Source of truth for the crawler, the scoring engine and the dashboard.
+#
+# Field reference
+#   id         unique, stable identifier (never reuse a retired id)
+#   name       short label shown in the dashboard
+#   scope      page     -> evaluated on every crawled page (result = share of pages passing)
+#              site     -> evaluated once per domain
+#              language -> evaluated once per language version (e.g. /ar/ vs /en)
+#              project  -> evaluated across languages (pairing, hreflang reciprocity)
+#   applies_to optional page-group filter (e.g. blog, home, solutions). Omitted = all HTML pages
+#   method     crawl | render | api:psi | api:crux | api:places | api:openpagerank | api:commoncrawl |
+#              api:safebrowsing | api:gsc | api:serp (optional) | ai | manual
+#   new_in     catalog version that added the check
+#   severity   critical | high | medium | low | info
+#   weight     0-10 contribution inside its subsection (0 = reported, not scored)
+#   basis      google   -> stated in official Google documentation
+#              platform -> stated in the official docs of another platform (OpenAI, Bing, Perplexity...)
+#              industry -> widely accepted practice with no official Google statement
+#   source     key into the `sources` table at the bottom
+#   test       exact pass / warn / fail rule the engine applies
+#   fix        what the report tells the expert to do
+
+version: 0.3.0
+updated: 2026-11-11
+scoring:
+  results:
+    pass: 1.0
+    warn: 0.5
+    fail: 0.0
+    na: null
+    info: null
+  page_scope_rule: 'For page-scope checks: no failing page = pass, up to 10% of applicable pages failing = warn,
+    more = fail. The report lists the failing URLs.'
+  severity_floor: 'Any failing critical check caps its subsection score at 60 and its pillar score at 75, so a site
+    cannot look healthy while it has a blocking issue.
+
+    '
+  subsection_score: sum(weight x result) / sum(weight of applicable checks) x 100
+  section_score: weighted average of its subsections (subsection weights below)
+  pillar_score: weighted average of its sections (section weights below)
+  overall_score: weighted average of active pillars; N/A pillars (Local for non-local businesses, Site-type modules
+    when none applies) are removed and the weights renormalised to 100
+  pillar_weights:
+    seo: 40
+    geo: 25
+    aeo: 15
+    local: 20
+    vertical: 15
+  per_language: every score is computed per language version and for the project as a whole
+pillars:
+- id: seo
+  name: SEO
+  sections:
+  - id: seo.technical
+    name: Technical SEO
+    weight: 40
+    subsections:
+    - id: seo.technical.crawlability
+      name: Crawlability
+      weight: 18
+      checks:
+      - id: TECH-001
+        name: robots.txt reachable
+        scope: site
+        method: crawl
+        severity: critical
+        weight: 8
+        basis: google
+        source: g_robots
+        test: GET /robots.txt returns 200 (rules parsed) or 404 (treated as allow-all). 5xx = fail (Google pauses
+          crawling). 3xx chain > 5 hops = fail.
+        fix: 'Serve robots.txt as text/plain with 200. If the server returns 5xx for it, fix the origin/CDN rule
+          first: Google treats a persistent 5xx robots.txt as a full disallow.'
+      - id: TECH-002
+        name: robots.txt does not block important URLs
+        scope: site
+        method: crawl
+        severity: critical
+        weight: 10
+        basis: google
+        source: g_robots
+        test: No URL in the sitemap or main navigation is disallowed for Googlebot.
+        fix: Remove or narrow the Disallow rule that matches the listed URLs. Use noindex (not Disallow) for pages
+          that must stay out of the index; a disallowed page cannot have its noindex read.
+      - id: TECH-003
+        name: robots.txt does not block CSS/JS/images
+        scope: site
+        method: crawl
+        severity: high
+        weight: 6
+        basis: google
+        source: g_js
+        test: Rendering resources referenced by templates (CSS, JS, images, fonts) are not disallowed.
+        fix: Allow the asset paths listed in the report. Google must fetch them to render the page as users see
+          it.
+      - id: TECH-004
+        name: Sitemap declared in robots.txt
+        scope: site
+        method: crawl
+        severity: low
+        weight: 2
+        basis: google
+        source: g_sitemap_build
+        test: 'robots.txt contains at least one absolute Sitemap: directive.'
+        fix: 'Add `Sitemap: https://<domain>/sitemap.xml` to robots.txt and submit the same URL in Search Console.'
+      - id: TECH-005
+        name: XML sitemap valid
+        scope: site
+        method: crawl
+        severity: high
+        weight: 6
+        basis: google
+        source: g_sitemap_build
+        test: Sitemap (or index) returns 200, parses as XML, uses absolute URLs, <= 50,000 URLs and <= 50 MB uncompressed
+          per file.
+        fix: Regenerate the sitemap from the CMS; split into a sitemap index if limits are exceeded.
+      - id: TECH-006
+        name: Sitemap contains only indexable canonical URLs
+        scope: site
+        method: crawl
+        severity: medium
+        weight: 5
+        basis: google
+        source: g_sitemap_build
+        test: Every sitemap URL returns 200, is not noindex, and is its own canonical. > 2% violations = warn, >
+          10% = fail.
+        fix: Remove redirected, 404, noindex and canonicalised-away URLs from the sitemap. Listed in the report
+          with the reason per URL.
+      - id: TECH-007
+        name: Sitemap lastmod is accurate
+        scope: site
+        method: crawl
+        severity: low
+        weight: 2
+        basis: google
+        source: g_sitemap_build
+        test: lastmod present and not identical for all URLs; not in the future.
+        fix: Set lastmod to the date of the last significant content change. Google ignores lastmod when it is consistently
+          unreliable.
+      - id: TECH-008
+        name: Internal links are crawlable <a href>
+        scope: page
+        method: render
+        severity: high
+        weight: 6
+        basis: google
+        source: g_links
+        test: Navigation and in-content links use <a href='resolvable URL'>. Links that only exist as onclick/JS
+          handlers or href='#' = fail.
+        fix: Replace JS-only navigation with real anchor elements pointing to resolvable URLs.
+      - id: TECH-009
+        name: No broken internal links
+        scope: page
+        method: crawl
+        severity: high
+        weight: 7
+        basis: google
+        source: g_http
+        test: No internal link resolves to 4xx/5xx.
+        fix: Update each broken link to the live URL, or 301 the dead URL to its closest equivalent. Report lists
+          source page, anchor text and target.
+      - id: TECH-010
+        name: No redirect chains or loops
+        scope: site
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: google
+        source: g_redirects
+        test: Every redirect resolves in 1 hop. 2-4 hops = warn, >= 5 hops or loop = fail.
+        fix: Point the first URL directly at the final destination.
+      - id: TECH-011
+        name: Internal links point to final URLs
+        scope: page
+        method: crawl
+        severity: low
+        weight: 3
+        basis: industry
+        source: g_redirects
+        test: Internal links do not target URLs that redirect.
+        fix: Update internal links to the final destination URL to save crawl and avoid signal loss through hops.
+      - id: TECH-012
+        name: No server errors (5xx)
+        scope: site
+        method: crawl
+        severity: critical
+        weight: 8
+        basis: google
+        source: g_http
+        test: No crawled URL returns 5xx.
+        fix: Investigate origin logs for the listed URLs. Persistent 5xx reduces crawl rate and eventually drops
+          URLs from the index.
+      - id: TECH-013
+        name: Real 404 status for missing pages (no soft 404)
+        scope: site
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: google
+        source: g_http
+        test: A random non-existent URL returns 404/410, not 200 or a redirect to the homepage.
+        fix: Configure the CMS to return 404 for unknown paths with a helpful custom 404 template.
+      - id: TECH-014
+        name: Click depth
+        scope: page
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: industry
+        source: g_seo_starter
+        test: Important pages reachable within 3 clicks from the homepage. 4-5 = warn, > 5 = fail.
+        fix: Surface deep pages through hub pages, category pages or contextual links.
+      - id: TECH-015
+        name: No orphan pages
+        scope: page
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: google
+        source: g_links
+        test: Every sitemap URL receives at least one internal link from a crawled page.
+        fix: Link each orphan from its relevant hub (e.g. solution page -> related blog posts), or remove it from
+          the sitemap if obsolete.
+      - id: TECH-016
+        name: Sitemap URLs not blocked by robots.txt
+        scope: site
+        method: crawl
+        severity: high
+        weight: 5
+        basis: google
+        source: g_sitemap_build
+        test: No sitemap URL is disallowed in robots.txt.
+        fix: Remove the URL from the sitemap or lift the Disallow; conflicting signals waste crawl.
+        new_in: 0.2.0
+      - id: TECH-017
+        name: robots.txt within size limit
+        scope: site
+        method: crawl
+        severity: low
+        weight: 2
+        basis: google
+        source: g_robots
+        test: robots.txt <= 500 KiB (Google ignores content after the limit).
+        fix: Consolidate rules; use path patterns instead of listing URLs.
+        new_in: 0.2.0
+      - id: TECH-018
+        name: No crawl traps
+        scope: site
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: google
+        source: g_crawl_budget
+        test: 'No infinite URL spaces (calendars, faceted combinations, session paths) detected: > 500 URLs differing
+          only by parameters/path repetition = fail.'
+        fix: Block the trap pattern in robots.txt or stop generating crawlable links to it.
+        new_in: 0.2.0
+      - id: TECH-019
+        name: No meta refresh or JavaScript redirects
+        scope: page
+        method: render
+        severity: medium
+        weight: 4
+        basis: google
+        source: g_redirects
+        test: Redirects are server-side 301/308; meta refresh or JS location changes flagged.
+        fix: Replace with a server-side 301 (permanent) redirect.
+        new_in: 0.2.0
+      - id: TECH-019B
+        name: Correct redirect type
+        scope: site
+        method: crawl
+        severity: low
+        weight: 3
+        basis: google
+        source: g_redirects
+        test: Permanent moves use 301/308; 302/307 kept > 30 days on the same URL flagged.
+        fix: Switch long-lived temporary redirects to 301.
+        new_in: 0.2.0
+    - id: seo.technical.indexability
+      name: Indexability
+      weight: 18
+      checks:
+      - id: TECH-020
+        name: No unintended noindex
+        scope: page
+        method: crawl
+        severity: critical
+        weight: 10
+        basis: google
+        source: g_robots_meta
+        test: Pages in the sitemap/navigation carry no noindex in meta robots or X-Robots-Tag.
+        fix: Remove the noindex from the listed pages. Check both the HTML meta and the HTTP header (CDN/hosting
+          rules often inject X-Robots-Tag).
+      - id: TECH-021
+        name: Canonical tag present
+        scope: page
+        method: crawl
+        severity: medium
+        weight: 5
+        basis: google
+        source: g_canonical
+        test: Exactly one rel=canonical with an absolute URL in <head>.
+        fix: Add a self-referencing absolute canonical to every indexable template. Remove duplicate canonical tags.
+      - id: TECH-022
+        name: Canonical target is valid
+        scope: page
+        method: crawl
+        severity: high
+        weight: 7
+        basis: google
+        source: g_canonical
+        test: Canonical target returns 200, is indexable and is not itself canonicalised or redirected.
+        fix: Point the canonical at the live, indexable preferred URL.
+      - id: TECH-023
+        name: Canonical signals are consistent
+        scope: page
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: google
+        source: g_canonical
+        test: Canonical, sitemap, hreflang and internal links all reference the same preferred URL.
+        fix: Align the signals; conflicting signals let Google pick a different canonical than intended.
+      - id: TECH-024
+        name: Host and protocol consolidated
+        scope: site
+        method: crawl
+        severity: high
+        weight: 6
+        basis: google
+        source: g_canonical
+        test: http://, https://, www and non-www variants 301 to one preferred host.
+        fix: Add 301 rules at the CDN/host so every variant lands on the single preferred https host.
+      - id: TECH-025
+        name: Trailing slash and case consistency
+        scope: site
+        method: crawl
+        severity: low
+        weight: 2
+        basis: google
+        source: g_url_structure
+        test: Slash/no-slash and upper/lower-case variants redirect to one form.
+        fix: Pick one convention and 301 the other variants to it.
+      - id: TECH-026
+        name: No near-duplicate pages
+        scope: page
+        method: crawl
+        severity: medium
+        weight: 5
+        basis: google
+        source: g_canonical
+        test: Main-content similarity between two indexable pages < 90% (SimHash on boilerplate-stripped text).
+        fix: Merge the duplicates, differentiate their content, or canonicalise one to the other. Pairs are listed
+          with similarity %.
+      - id: TECH-027
+        name: Parameter URLs controlled
+        scope: site
+        method: crawl
+        severity: low
+        weight: 3
+        basis: google
+        source: g_crawl_budget
+        test: Tracking/filter parameter URLs (utm_, sort, session ids) are canonicalised to the clean URL and not
+          linked internally.
+        fix: Canonicalise parameter variants to the clean URL and stop linking to them internally.
+      - id: TECH-028
+        name: Non-HTML files indexable intentionally
+        scope: site
+        method: crawl
+        severity: low
+        weight: 2
+        basis: google
+        source: g_robots_meta
+        test: 'PDFs/docs that duplicate HTML pages carry X-Robots-Tag noindex or a Link: rel=canonical header.'
+        fix: Add an HTTP canonical or noindex header for duplicate documents.
+        new_in: 0.2.0
+      - id: TECH-029
+        name: Archive/tag pages controlled
+        scope: page
+        method: crawl
+        severity: low
+        weight: 3
+        basis: industry
+        source: g_helpful
+        test: Thin tag, author or date archives (< 3 items or no unique text) are noindexed or not generated.
+        fix: Noindex or remove thin archive pages.
+        new_in: 0.2.0
+      - id: TECH-029B
+        name: No conflicting robots directives
+        scope: page
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: google
+        source: g_robots_meta
+        test: No page has multiple robots meta tags/headers with contradictory values (Google applies the most restrictive).
+        fix: Keep one robots directive per page.
+        new_in: 0.2.0
+    - id: seo.technical.rendering
+      name: JavaScript rendering
+      weight: 9
+      checks:
+      - id: TECH-030
+        name: Main content present in initial HTML
+        scope: page
+        method: render
+        severity: high
+        weight: 8
+        basis: google
+        source: g_js
+        test: Raw HTML contains >= 80% of the rendered main-content text. 50-79% = warn, < 50% = fail.
+        fix: Server-render or pre-render the main content. Google can render JS (deferred), but most AI crawlers
+          cannot (see GEO-011).
+      - id: TECH-031
+        name: Title, meta, canonical not injected by JS only
+        scope: page
+        method: render
+        severity: medium
+        weight: 5
+        basis: google
+        source: g_js
+        test: Title, meta description, canonical and robots meta are identical in raw and rendered HTML.
+        fix: Output head tags server-side; do not change canonical or robots via JavaScript.
+      - id: TECH-032
+        name: Lazy-loaded content is crawlable
+        scope: page
+        method: render
+        severity: medium
+        weight: 4
+        basis: google
+        source: g_lazy
+        test: Lazy-loaded images/sections load without scroll or interaction events (native loading=lazy or IntersectionObserver).
+        fix: Use native loading='lazy' or IntersectionObserver; never require scroll/click to inject content.
+    - id: seo.technical.performance
+      name: Page experience & Core Web Vitals
+      weight: 14
+      checks:
+      - id: TECH-040
+        name: LCP (field data)
+        scope: page
+        method: api:crux
+        severity: high
+        weight: 7
+        basis: google
+        source: g_cwv
+        test: p75 LCP <= 2.5 s pass, <= 4.0 s warn, > 4.0 s fail. Falls back to origin-level data when URL-level
+          is unavailable.
+        fix: 'Report shows the LCP element from Lighthouse. Typical levers: preload/priority-hint the hero image,
+          serve AVIF/WebP at the rendered size, cut server TTFB, remove render-blocking CSS/JS.'
+      - id: TECH-041
+        name: INP (field data)
+        scope: page
+        method: api:crux
+        severity: high
+        weight: 7
+        basis: google
+        source: g_cwv
+        test: p75 INP <= 200 ms pass, <= 500 ms warn, > 500 ms fail.
+        fix: Break up long tasks, defer third-party scripts (chat widgets, tag managers), reduce main-thread JS.
+          Report lists the heaviest scripts.
+      - id: TECH-042
+        name: CLS (field data)
+        scope: page
+        method: api:crux
+        severity: medium
+        weight: 6
+        basis: google
+        source: g_cwv
+        test: p75 CLS <= 0.1 pass, <= 0.25 warn, > 0.25 fail.
+        fix: Set width/height on images and embeds, reserve space for banners/cookie bars, use font-display with
+          size-adjusted fallbacks.
+      - id: TECH-043
+        name: Lighthouse performance (lab, mobile)
+        scope: page
+        method: api:psi
+        severity: low
+        weight: 3
+        basis: industry
+        source: g_page_exp
+        test: Mobile performance score >= 90 pass, 50-89 warn, < 50 fail. Diagnostic only; field data (TECH-040-042)
+          outweighs it.
+        fix: Follow the top 3 Lighthouse opportunities listed per URL.
+      - id: TECH-044
+        name: Server response time (TTFB)
+        scope: page
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: industry
+        source: g_crawl_budget
+        test: TTFB <= 800 ms pass, <= 1800 ms warn, > 1800 ms fail (measured from the crawler region, repeated 3x).
+        fix: Enable CDN HTML caching, review origin/database latency.
+      - id: TECH-045
+        name: LCP image not lazy-loaded
+        scope: page
+        method: api:psi
+        severity: medium
+        weight: 4
+        basis: industry
+        source: g_lazy
+        test: The LCP element is not loading='lazy' and has fetchpriority='high' or a preload.
+        fix: Remove lazy loading from the hero image and add fetchpriority='high'.
+        new_in: 0.2.0
+      - id: TECH-046
+        name: No intrusive interstitials
+        scope: page
+        method: render
+        severity: medium
+        weight: 4
+        basis: google
+        source: g_page_exp
+        test: No full-screen popup covering main content on mobile at load (cookie/legal notices excepted).
+        fix: Replace with a banner using a reasonable share of the screen.
+        new_in: 0.2.0
+    - id: seo.technical.mobile
+      name: Mobile
+      weight: 8
+      checks:
+      - id: TECH-050
+        name: Viewport meta tag
+        scope: page
+        method: crawl
+        severity: high
+        weight: 6
+        basis: google
+        source: g_mobile_first
+        test: <meta name='viewport' content='width=device-width, initial-scale=1'> present.
+        fix: Add the viewport tag to the base template.
+      - id: TECH-051
+        name: Mobile/desktop content parity
+        scope: page
+        method: render
+        severity: high
+        weight: 7
+        basis: google
+        source: g_mobile_first
+        test: Mobile render (Googlebot smartphone UA) contains the same main text, headings, structured data, images/alt
+          and meta as desktop (>= 95% text match).
+        fix: Google indexes the mobile version. Do not hide content, links or schema on mobile breakpoints.
+      - id: TECH-052
+        name: Structured data and meta on mobile
+        scope: page
+        method: render
+        severity: medium
+        weight: 4
+        basis: google
+        source: g_mobile_first
+        test: Mobile HTML contains the same structured data, title, meta description, robots meta and alt text as
+          desktop.
+        fix: Output the same head and markup on the mobile version.
+        new_in: 0.2.0
+      - id: TECH-053
+        name: Mobile usability (lab)
+        scope: page
+        method: api:psi
+        severity: low
+        weight: 3
+        basis: industry
+        source: g_mobile_first
+        test: 'Lighthouse mobile: legible font sizes, tap targets sized, no horizontal scroll.'
+        fix: Fix the elements Lighthouse lists.
+        new_in: 0.2.0
+    - id: seo.technical.security
+      name: Security
+      weight: 9
+      checks:
+      - id: TECH-060
+        name: HTTPS on all pages
+        scope: site
+        method: crawl
+        severity: critical
+        weight: 8
+        basis: google
+        source: g_page_exp
+        test: All pages served over HTTPS with a valid, non-expired certificate.
+        fix: Install/renew the certificate and 301 all http URLs to https.
+      - id: TECH-061
+        name: No mixed content
+        scope: page
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: google
+        source: g_page_exp
+        test: No http:// subresources on https pages.
+        fix: Update the listed asset URLs to https.
+      - id: TECH-062
+        name: HSTS header
+        scope: site
+        method: crawl
+        severity: low
+        weight: 2
+        basis: industry
+        source: mdn_hsts
+        test: Strict-Transport-Security header with max-age >= 31536000.
+        fix: Enable HSTS at the CDN after confirming every subdomain serves HTTPS.
+      - id: TECH-063
+        name: Not flagged by Safe Browsing
+        scope: site
+        method: api:safebrowsing
+        severity: critical
+        weight: 8
+        basis: google
+        source: g_safebrowsing
+        test: Domain and sampled URLs not listed as malware, phishing or unwanted software.
+        fix: Clean the infection, then request a review in Search Console > Security issues.
+        new_in: 0.2.0
+      - id: TECH-064
+        name: No hacked spam content
+        scope: page
+        method: crawl
+        severity: critical
+        weight: 6
+        basis: google
+        source: g_spam
+        test: No injected spam (pharma/casino/Japanese keyword hack), hidden links or cloaked text detected, including
+          pages only shown to Googlebot UA.
+        fix: Remove the injected content, patch the CMS/plugins, and rotate credentials.
+        new_in: 0.2.0
+    - id: seo.technical.international
+      name: International & multilingual
+      weight: 10
+      checks:
+      - id: TECH-070
+        name: hreflang present on multilingual pages
+        scope: page
+        method: crawl
+        severity: high
+        weight: 7
+        basis: google
+        source: g_hreflang
+        test: Every page that has a counterpart in another configured language declares hreflang for all versions
+          (HTML, header or sitemap).
+        fix: Add hreflang annotations listing every language version, including the page itself.
+      - id: TECH-071
+        name: hreflang return links (reciprocity)
+        scope: project
+        method: crawl
+        severity: high
+        weight: 7
+        basis: google
+        source: g_hreflang
+        test: If A references B, B references A. Missing return link = fail for the pair.
+        fix: Add the missing return annotation on the listed counterpart; Google ignores non-reciprocal hreflang.
+      - id: TECH-072
+        name: hreflang codes valid
+        scope: page
+        method: crawl
+        severity: medium
+        weight: 5
+        basis: google
+        source: g_hreflang
+        test: Language in ISO 639-1, optional region in ISO 3166-1 alpha-2 (e.g. ar, ar-SA, en). Flags common errors
+          such as en-UK or ar-AR.
+        fix: Replace the invalid codes listed in the report.
+      - id: TECH-073
+        name: hreflang targets are canonical and live
+        scope: page
+        method: crawl
+        severity: medium
+        weight: 5
+        basis: google
+        source: g_hreflang
+        test: Every hreflang URL returns 200, is indexable and is its own canonical.
+        fix: Point hreflang only at the canonical URL of each version.
+      - id: TECH-074
+        name: x-default declared
+        scope: page
+        method: crawl
+        severity: low
+        weight: 2
+        basis: google
+        source: g_hreflang
+        test: An x-default annotation exists for the language selector or default version.
+        fix: Add hreflang='x-default' pointing to the default (or language-selector) version.
+      - id: TECH-075
+        name: Every page has its counterpart in each language
+        scope: project
+        method: crawl
+        severity: medium
+        weight: 5
+        basis: industry
+        source: g_hreflang
+        test: For each configured language pair, every page has a translated version (matched via hreflang, then
+          slug).
+        fix: Publish the missing translation or remove the link to the non-existent version from the language switcher.
+      - id: TECH-076
+        name: Slug consistency across languages
+        scope: project
+        method: crawl
+        severity: low
+        weight: 2
+        basis: industry
+        source: g_url_structure
+        test: Paired pages share the same slug after the language prefix, or the difference is intentional and declared
+          via hreflang.
+        fix: Align the slug (with a 301 from the old one) or confirm the pair through hreflang.
+      - id: TECH-077
+        name: Content language matches declared language
+        scope: page
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: google
+        source: g_multiregional
+        test: Detected language of main content (title, H1, body) matches the language of its URL group. Mixed-language
+          titles/H1s on /ar/ pages are flagged.
+        fix: Translate untranslated elements (titles, H1, navigation, CTAs). Google detects language from visible
+          content, so untranslated templates weaken the version.
+      - id: TECH-078
+        name: html lang and dir attributes
+        scope: page
+        method: crawl
+        severity: low
+        weight: 2
+        basis: industry
+        source: w3c_lang
+        test: <html lang> matches the version; RTL languages carry dir='rtl'.
+        fix: Set lang and dir per locale in the template. Google does not use lang for ranking, but Bing, screen
+          readers and AI parsers do.
+      - id: TECH-079
+        name: Language switcher is crawlable
+        scope: page
+        method: crawl
+        severity: low
+        weight: 3
+        basis: google
+        source: g_multiregional
+        test: Language switcher links are <a href> to the equivalent page (not the homepage, not JS-only); no automatic
+          redirect by IP/Accept-Language.
+        fix: Link each page to its exact counterpart; never force-redirect users or Googlebot by locale.
+        new_in: 0.2.0
+      - id: TECH-079B
+        name: Untranslated duplicate content across languages
+        scope: project
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: google
+        source: g_multiregional
+        test: Pages in the /ar/ group whose title/H1/body are still in English (or vice versa) beyond 30% of text.
+        fix: Translate the page; untranslated versions are treated as duplicates.
+        new_in: 0.2.0
+    - id: seo.technical.urls
+      name: URL structure
+      weight: 4
+      checks:
+      - id: TECH-080
+        name: Descriptive, readable URLs
+        scope: page
+        method: crawl
+        severity: low
+        weight: 4
+        basis: google
+        source: g_url_structure
+        test: Path uses words separated by hyphens, no session IDs, no underscores, <= 115 characters.
+        fix: Use short, descriptive hyphenated slugs; 301 old URLs when changing them.
+      - id: TECH-081
+        name: Lowercase URLs
+        scope: page
+        method: crawl
+        severity: low
+        weight: 2
+        basis: industry
+        source: g_url_structure
+        test: No uppercase characters in internal URL paths.
+        fix: Lower-case the slugs and 301 the old variants.
+    - id: seo.technical.server
+      name: Server & delivery
+      weight: 5
+      checks:
+      - id: TECH-090
+        name: Text compression
+        scope: page
+        method: crawl
+        severity: low
+        weight: 3
+        basis: industry
+        source: g_page_exp
+        test: HTML/CSS/JS served with Brotli or gzip.
+        fix: Enable compression at the CDN/origin.
+        new_in: 0.2.0
+      - id: TECH-091
+        name: Caching headers on static assets
+        scope: page
+        method: crawl
+        severity: low
+        weight: 3
+        basis: industry
+        source: g_page_exp
+        test: Static assets have Cache-Control max-age >= 30 days (fingerprinted).
+        fix: Set long cache lifetimes with versioned file names.
+        new_in: 0.2.0
+      - id: TECH-092
+        name: HTML size within Googlebot limit
+        scope: page
+        method: crawl
+        severity: medium
+        weight: 3
+        basis: google
+        source: g_crawlers
+        test: Each HTML file < 15 MB (Googlebot indexes only the first 15 MB); > 2 MB = warn.
+        fix: Move inline data/scripts out of the HTML.
+        new_in: 0.2.0
+      - id: TECH-093
+        name: HTTP/2 or HTTP/3
+        scope: site
+        method: crawl
+        severity: low
+        weight: 1
+        basis: industry
+        source: g_crawl_budget
+        test: Server negotiates h2 or h3.
+        fix: Enable HTTP/2+ at the CDN.
+        new_in: 0.2.0
+      - id: TECH-094
+        name: Availability during crawl
+        scope: site
+        method: crawl
+        severity: high
+        weight: 5
+        basis: google
+        source: g_http
+        test: Error/timeout rate < 1% across the crawl; DNS resolves consistently.
+        fix: Investigate hosting capacity or rate limiting toward crawlers.
+        new_in: 0.2.0
+    - id: seo.technical.measurement
+      name: Measurement & verification
+      weight: 5
+      checks:
+      - id: TECH-100
+        name: Search Console connected
+        scope: site
+        method: api:gsc
+        severity: high
+        weight: 6
+        basis: google
+        source: g_gsc
+        test: Property verified and accessible to the tool (enables index coverage, manual actions, CWV, queries).
+          N/A if not connected.
+        fix: Verify the domain property and grant read access to unlock the Search Console checks.
+        new_in: 0.2.0
+      - id: TECH-101
+        name: No manual actions
+        scope: site
+        method: api:gsc
+        severity: critical
+        weight: 10
+        basis: google
+        source: g_manual_actions
+        test: Search Console manual actions report is empty.
+        fix: Fix the stated violation and file a reconsideration request.
+        new_in: 0.2.0
+      - id: TECH-102
+        name: Indexed vs submitted pages
+        scope: site
+        method: api:gsc
+        severity: high
+        weight: 6
+        basis: google
+        source: g_gsc
+        test: Share of sitemap URLs indexed >= 90% pass, 70-89% warn, < 70% fail; top 'not indexed' reasons reported.
+        fix: Work through the not-indexed reasons listed (crawled-not-indexed usually signals content quality).
+        new_in: 0.2.0
+      - id: TECH-103
+        name: Analytics installed
+        scope: site
+        method: crawl
+        severity: low
+        weight: 2
+        basis: industry
+        source: g_gsc
+        test: GA4 (or equivalent) tag present on all templates.
+        fix: Add the tag to the base template to measure organic and AI referral traffic.
+        new_in: 0.2.0
+      - id: TECH-104
+        name: Bing Webmaster Tools verified
+        scope: site
+        method: crawl
+        severity: low
+        weight: 2
+        basis: platform
+        source: bing_guidelines
+        test: msvalidate.01 meta / BingSiteAuth.xml / DNS verification detected.
+        fix: Verify in Bing Webmaster Tools (feeds Copilot and ChatGPT search signals).
+        new_in: 0.2.0
+      - id: TECH-105
+        name: IndexNow supported
+        scope: site
+        method: crawl
+        severity: low
+        weight: 1
+        basis: platform
+        source: indexnow
+        test: IndexNow key file found at the declared location.
+        fix: Enable IndexNow (CMS plugin or CDN) to notify Bing/Yandex of changes instantly.
+        new_in: 0.2.0
+  - id: seo.onpage
+    name: On-page SEO
+    weight: 45
+    subsections:
+    - id: seo.onpage.meta
+      name: Meta & SERP appearance
+      weight: 18
+      checks:
+      - id: META-001
+        name: Title tag present
+        scope: page
+        method: crawl
+        severity: critical
+        weight: 10
+        basis: google
+        source: g_title
+        test: Exactly one non-empty <title>.
+        fix: Write a unique, descriptive title for each listed page.
+      - id: META-002
+        name: Title unique across the site
+        scope: page
+        method: crawl
+        severity: high
+        weight: 7
+        basis: google
+        source: g_title
+        test: No two indexable pages in the same language share a title.
+        fix: Differentiate titles by the page's specific topic; groups of duplicates are listed.
+      - id: META-003
+        name: Title length
+        scope: page
+        method: crawl
+        severity: low
+        weight: 3
+        basis: industry
+        source: g_title
+        test: Rendered width <= 580 px (approx. 50-60 Latin / 45-60 Arabic characters). Google sets no limit but
+          truncates in SERPs; < 15 characters = warn.
+        fix: Front-load the primary topic and keep the brand suffix short.
+      - id: META-004
+        name: Title is descriptive, not boilerplate
+        scope: page
+        method: ai
+        severity: medium
+        weight: 5
+        basis: google
+        source: g_title
+        test: Title describes the page's topic, is not a slug/placeholder (e.g. 'about-us', 'email-marketing'),
+          not keyword-stuffed, and is spelled correctly.
+        fix: Rewrite the listed titles; the report proposes a title per page based on its H1 and content.
+      - id: META-005
+        name: Consistent brand suffix
+        scope: language
+        method: crawl
+        severity: low
+        weight: 2
+        basis: google
+        source: g_title
+        test: Brand appears once, in the same form, in titles of each page group (e.g. '| WideBot Blog'). Variants
+          and misspellings are flagged.
+        fix: Normalise the suffix in the CMS template.
+      - id: META-006
+        name: Title aligns with H1
+        scope: page
+        method: crawl
+        severity: low
+        weight: 3
+        basis: google
+        source: g_title
+        test: Title and H1 share the core topic (token overlap >= 50% after stop-word removal).
+        fix: Google may rewrite titles that do not match the visible heading; align them.
+      - id: META-010
+        name: Meta description present
+        scope: page
+        method: crawl
+        severity: medium
+        weight: 5
+        basis: google
+        source: g_snippet
+        test: Non-empty meta description.
+        fix: Write a page-specific description summarising the page's value.
+      - id: META-011
+        name: Meta description unique
+        scope: page
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: google
+        source: g_snippet
+        test: No duplicate descriptions among indexable pages in the same language.
+        fix: Rewrite duplicates so each reflects its page.
+      - id: META-012
+        name: Meta description length
+        scope: page
+        method: crawl
+        severity: low
+        weight: 2
+        basis: industry
+        source: g_snippet
+        test: 70-160 characters (approx. 920 px).
+        fix: Keep the key message in the first 120 characters.
+      - id: META-020
+        name: Open Graph tags
+        scope: page
+        method: crawl
+        severity: low
+        weight: 3
+        basis: industry
+        source: ogp
+        test: og:title, og:description, og:image (>= 1200x630), og:url present; og:url equals canonical.
+        fix: Add the missing OG tags in the template; og:image should be page-specific where possible.
+      - id: META-021
+        name: Twitter/X card
+        scope: page
+        method: crawl
+        severity: low
+        weight: 1
+        basis: industry
+        source: x_cards
+        test: twitter:card present (summary_large_image recommended).
+        fix: Add twitter:card; X falls back to OG for the remaining fields.
+      - id: META-030
+        name: Favicon eligible for Search
+        scope: site
+        method: crawl
+        severity: low
+        weight: 2
+        basis: google
+        source: g_favicon
+        test: <link rel='icon'> on the homepage, square, multiple of 48 px, crawlable.
+        fix: Provide a 48x48 (or 96/144) square favicon referenced from the homepage head.
+      - id: META-031
+        name: Site name declared
+        scope: site
+        method: crawl
+        severity: low
+        weight: 2
+        basis: google
+        source: g_site_names
+        test: WebSite structured data with name (and alternateName) on the homepage.
+        fix: Add WebSite JSON-LD with the brand name in each language version's homepage.
+      - id: META-007
+        name: Titles differ between language versions
+        scope: project
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: google
+        source: g_title
+        test: Paired AR/EN pages do not share an identical (untranslated) title.
+        fix: Translate the title of the listed pages.
+        new_in: 0.2.0
+      - id: META-013
+        name: Description matches page language
+        scope: page
+        method: crawl
+        severity: low
+        weight: 2
+        basis: google
+        source: g_snippet
+        test: Meta description written in the page's language.
+        fix: Translate the description.
+        new_in: 0.2.0
+    - id: seo.onpage.headings
+      name: Headings
+      weight: 5
+      checks:
+      - id: HEAD-001
+        name: H1 present
+        scope: page
+        method: crawl
+        severity: high
+        weight: 7
+        basis: google
+        source: g_seo_starter
+        test: At least one non-empty H1 in the main content.
+        fix: Add a visible H1 stating the page topic.
+      - id: HEAD-002
+        name: Single H1
+        scope: page
+        method: crawl
+        severity: low
+        weight: 2
+        basis: industry
+        source: g_seo_starter
+        test: Exactly one H1 (multiple H1s are allowed by Google; flagged as warn for clarity).
+        fix: Keep one H1 for the main topic and demote the others to H2.
+      - id: HEAD-003
+        name: Logical heading hierarchy
+        scope: page
+        method: crawl
+        severity: low
+        weight: 3
+        basis: industry
+        source: g_seo_starter
+        test: No skipped levels (H2 -> H4) and no empty headings.
+        fix: Restructure headings so they outline the content.
+      - id: HEAD-004
+        name: Headings not used for styling
+        scope: page
+        method: crawl
+        severity: low
+        weight: 2
+        basis: industry
+        source: g_seo_starter
+        test: No heading tags in header/footer/nav templates except the logo-less site title.
+        fix: Replace decorative headings in templates with styled paragraphs/spans.
+    - id: seo.onpage.content
+      name: Content quality
+      weight: 25
+      checks:
+      - id: CONT-001
+        name: Sufficient main content
+        scope: page
+        method: crawl
+        severity: medium
+        weight: 5
+        basis: industry
+        source: g_helpful
+        test: 'Main-content word count by page type: blog >= 800, solution/product >= 500, other >= 250. Google
+          sets no minimum; thresholds flag likely thin pages.'
+        fix: Expand the listed pages with information users need to decide (use cases, specifics, examples) rather
+          than filler.
+      - id: CONT-002
+        name: People-first helpfulness
+        scope: page
+        method: ai
+        severity: high
+        weight: 8
+        basis: google
+        source: g_helpful
+        test: AI scores the page against Google's self-assessment questions (original information, complete description
+          of the topic, insight beyond the obvious, satisfies the need). Score >= 70 pass, 50-69 warn, < 50 fail.
+        fix: Report lists which questions the page fails and the specific gaps.
+      - id: CONT-003
+        name: Clear topic focus
+        scope: page
+        method: ai
+        severity: medium
+        weight: 5
+        basis: google
+        source: g_seo_starter
+        test: Primary topic identifiable from title, H1 and first 100 words; one dominant search intent.
+        fix: State the topic early and remove sections that serve a different intent (move them to their own page).
+      - id: CONT-004
+        name: No keyword stuffing
+        scope: page
+        method: crawl
+        severity: high
+        weight: 5
+        basis: google
+        source: g_spam
+        test: No single non-stop-word term > 3% of main content; no repeated keyword lists.
+        fix: Rewrite unnaturally repeated phrases; use natural synonyms.
+      - id: CONT-005
+        name: No scaled low-value content
+        scope: language
+        method: ai
+        severity: high
+        weight: 6
+        basis: google
+        source: g_spam
+        test: Detects groups of templated pages with near-identical text and little unique value (e.g. city/industry
+          pages differing only by a name).
+        fix: Add unique, substantive content per page or consolidate them.
+      - id: CONT-006
+        name: Spelling and grammar
+        scope: page
+        method: ai
+        severity: medium
+        weight: 3
+        basis: google
+        source: g_helpful
+        test: No spelling errors in title, meta description, H1-H3; body error rate < 1 per 300 words.
+        fix: Correct the listed errors (quoted in context).
+      - id: CONT-007
+        name: Content freshness
+        scope: page
+        method: crawl
+        severity: low
+        weight: 3
+        basis: industry
+        source: g_dates
+        test: Time-sensitive pages (titles containing a year, 'latest', statistics) updated within 12 months; no
+          stale year in titles.
+        fix: Refresh the facts and update dateModified only when the content materially changes.
+      - id: CONT-008
+        name: Outbound citations to authoritative sources
+        scope: page
+        method: crawl
+        severity: low
+        weight: 3
+        basis: industry
+        source: g_qrg
+        test: Pages making factual/statistical claims link at least one authoritative external source.
+        fix: Cite the primary source for each statistic or regulation mentioned.
+      - id: CONT-009
+        name: No broken outbound links
+        scope: page
+        method: crawl
+        severity: low
+        weight: 2
+        basis: industry
+        source: g_helpful
+        test: External links return 2xx/3xx.
+        fix: Replace or remove the dead external links listed.
+      - id: CONT-010
+        name: No keyword cannibalisation
+        scope: language
+        method: crawl
+        severity: medium
+        weight: 5
+        basis: industry
+        source: g_canonical
+        test: No two indexable pages in the same language target the same primary topic (title/H1 similarity > 80%,
+          or same top query when GSC connected).
+        fix: Merge, re-target or differentiate the conflicting pages; pairs listed.
+        new_in: 0.2.0
+      - id: CONT-011
+        name: Primary topic in URL, title, H1 and intro
+        scope: page
+        method: crawl
+        severity: low
+        weight: 3
+        basis: google
+        source: g_seo_starter
+        test: The page's main term appears in title, H1 and first 100 words.
+        fix: Align the four elements on one topic.
+        new_in: 0.2.0
+      - id: CONT-012
+        name: Hidden or deceptive content
+        scope: page
+        method: render
+        severity: high
+        weight: 5
+        basis: google
+        source: g_spam
+        test: No text hidden via CSS (same color as background, off-screen, font-size 0) to manipulate ranking.
+          Tabs/accordions are fine.
+        fix: Remove the hidden text.
+        new_in: 0.2.0
+      - id: CONT-013
+        name: AI-generated content level (informational)
+        scope: page
+        method: ai
+        severity: info
+        weight: 0
+        basis: google
+        source: g_ai_content
+        test: Estimated share of machine-generated text reported. Google does not penalise AI content per se; only
+          low-value scaled content (CONT-005).
+        fix: Review high-AI pages for originality and expert input.
+        new_in: 0.2.0
+      - id: CONT-014
+        name: Ads and CTAs do not dominate
+        scope: page
+        method: render
+        severity: low
+        weight: 2
+        basis: google
+        source: g_qrg
+        test: Main content visible above the fold; ads/promotional blocks < 30% of viewport at load.
+        fix: Reduce or move the blocks pushing main content down.
+        new_in: 0.2.0
+    - id: seo.onpage.blog
+      name: Blog & articles
+      weight: 14
+      applies_to: blog
+      checks:
+      - id: BLOG-001
+        name: Visible author byline
+        scope: page
+        applies_to: blog
+        method: crawl
+        severity: high
+        weight: 6
+        basis: google
+        source: g_helpful
+        test: Article shows an author name linked to an author page.
+        fix: Add a byline linking to the author's profile page.
+      - id: BLOG-002
+        name: Author pages with credentials
+        scope: site
+        applies_to: blog
+        method: ai
+        severity: medium
+        weight: 5
+        basis: google
+        source: g_qrg
+        test: Each author page states role, expertise and experience, with links to external profiles.
+        fix: Create/complete author pages; add Person schema with sameAs (LinkedIn etc.).
+      - id: BLOG-003
+        name: Visible publish and update dates
+        scope: page
+        applies_to: blog
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: google
+        source: g_dates
+        test: A visible date near the title, consistent with datePublished/dateModified in schema.
+        fix: Display 'Published' and 'Updated' dates and keep them consistent with the structured data.
+      - id: BLOG-004
+        name: Article/BlogPosting schema complete
+        scope: page
+        applies_to: blog
+        method: crawl
+        severity: medium
+        weight: 5
+        basis: google
+        source: g_sd_article
+        test: headline, image, datePublished, dateModified, author (Person with name + url) present and valid.
+        fix: Complete the missing properties listed per post.
+      - id: BLOG-005
+        name: Contextual links to commercial pages
+        scope: page
+        applies_to: blog
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: industry
+        source: g_links
+        test: Each post links to >= 1 relevant product/solution page with a descriptive anchor.
+        fix: Add contextual links from the post body to the matching product/solution pages (suggestions listed).
+      - id: BLOG-006
+        name: Related posts / topic clustering
+        scope: page
+        applies_to: blog
+        method: crawl
+        severity: low
+        weight: 3
+        basis: industry
+        source: g_links
+        test: Post links to >= 2 other posts on the same topic.
+        fix: Add a related-posts module and in-text links within the cluster.
+      - id: BLOG-007
+        name: Table of contents on long articles
+        scope: page
+        applies_to: blog
+        method: crawl
+        severity: low
+        weight: 2
+        basis: industry
+        source: g_snippet
+        test: Articles > 1,500 words have jump links to H2 sections.
+        fix: Add a TOC with anchor links; Google can show these as 'jump to' links.
+      - id: BLOG-008
+        name: Blog index crawlable
+        scope: site
+        applies_to: blog
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: google
+        source: g_pagination
+        test: Every post is reachable through paginated <a href> links (not only 'load more' JS).
+        fix: Provide crawlable pagination URLs (?page=2) alongside any infinite scroll.
+      - id: BLOG-009
+        name: RSS/Atom feed
+        scope: site
+        applies_to: blog
+        method: crawl
+        severity: low
+        weight: 1
+        basis: google
+        source: g_sitemap_build
+        test: Feed linked with <link rel='alternate' type='application/rss+xml'>.
+        fix: Expose a feed; Google accepts RSS/Atom as a sitemap source for fresh URLs.
+      - id: BLOG-010
+        name: Category structure
+        scope: site
+        method: crawl
+        severity: low
+        weight: 2
+        basis: industry
+        source: g_links
+        test: Posts assigned to topical categories with indexable, content-rich category pages.
+        fix: Create topic hubs that summarise and link the cluster.
+        new_in: 0.2.0
+      - id: BLOG-011
+        name: Featured image and alt per post
+        scope: page
+        method: crawl
+        severity: low
+        weight: 2
+        basis: google
+        source: g_images
+        test: Each post has a primary image (>= 1200 px wide) referenced in Article image and og:image.
+        fix: Add a large, relevant featured image.
+        new_in: 0.2.0
+    - id: seo.onpage.images
+      name: Images & media
+      weight: 9
+      checks:
+      - id: IMG-001
+        name: Descriptive alt text
+        scope: page
+        method: crawl
+        severity: medium
+        weight: 6
+        basis: google
+        source: g_images
+        test: Content images have non-empty alt that is not a filename. Decorative images may use alt=''.
+        fix: Write alt text describing each listed image in context.
+      - id: IMG-002
+        name: Descriptive file names
+        scope: page
+        method: crawl
+        severity: low
+        weight: 2
+        basis: google
+        source: g_images
+        test: File names are words, not IMG_1234 / random hashes.
+        fix: Rename on upload to short descriptive names.
+      - id: IMG-003
+        name: Modern formats and sizing
+        scope: page
+        method: api:psi
+        severity: medium
+        weight: 4
+        basis: industry
+        source: g_cwv
+        test: Images served as WebP/AVIF, not > 2x their rendered size, < 200 KB for content images.
+        fix: Convert and resize the listed images; use srcset for responsive sizes.
+      - id: IMG-004
+        name: Explicit dimensions
+        scope: page
+        method: crawl
+        severity: low
+        weight: 3
+        basis: industry
+        source: g_cwv
+        test: <img> has width/height attributes or CSS aspect-ratio.
+        fix: Add dimensions to prevent layout shift (CLS).
+      - id: IMG-005
+        name: Images crawlable
+        scope: page
+        method: render
+        severity: medium
+        weight: 4
+        basis: google
+        source: g_images
+        test: Important images use <img src> (not CSS backgrounds) and are not blocked by robots.txt.
+        fix: Move content images from CSS backgrounds to <img> elements.
+      - id: IMG-006
+        name: Video discoverability
+        scope: page
+        method: crawl
+        severity: low
+        weight: 2
+        basis: google
+        source: g_video
+        test: Pages with embedded video provide VideoObject schema (name, thumbnailUrl, uploadDate).
+        fix: Add VideoObject structured data for each embedded video.
+      - id: IMG-007
+        name: Linked images have alt
+        scope: page
+        method: crawl
+        severity: medium
+        weight: 3
+        basis: google
+        source: g_links
+        test: Images used as links have alt describing the destination (it is their anchor text).
+        fix: Write alt describing the target page.
+        new_in: 0.2.0
+    - id: seo.onpage.internal_links
+      name: Internal linking
+      weight: 9
+      checks:
+      - id: LINK-001
+        name: Descriptive anchor text
+        scope: page
+        method: crawl
+        severity: medium
+        weight: 5
+        basis: google
+        source: g_links
+        test: No in-content internal links with generic anchors ('click here', 'read more', 'اضغط هنا', 'اقرأ المزيد')
+          or empty anchors.
+        fix: Rewrite anchors to describe the target page.
+      - id: LINK-002
+        name: Adequate inbound internal links
+        scope: page
+        method: crawl
+        severity: medium
+        weight: 5
+        basis: industry
+        source: g_links
+        test: Important pages receive >= 3 internal links from distinct pages.
+        fix: Add links from related pages; suggestions listed by topical similarity.
+      - id: LINK-003
+        name: No nofollow on internal links
+        scope: page
+        method: crawl
+        severity: low
+        weight: 3
+        basis: google
+        source: g_qualify_links
+        test: Internal links do not carry rel=nofollow.
+        fix: Remove nofollow from internal links.
+      - id: LINK-004
+        name: Outbound link qualification
+        scope: page
+        method: crawl
+        severity: low
+        weight: 2
+        basis: google
+        source: g_qualify_links
+        test: Paid/affiliate links carry rel='sponsored'; user-generated links rel='ugc'.
+        fix: Add the correct rel attribute.
+        new_in: 0.2.0
+      - id: LINK-005
+        name: Breadcrumb navigation visible
+        scope: page
+        method: crawl
+        severity: low
+        weight: 2
+        basis: google
+        source: g_sd_breadcrumb
+        test: Non-home pages show a visible breadcrumb trail.
+        fix: Add a breadcrumb component reflecting the hierarchy.
+        new_in: 0.2.0
+    - id: seo.onpage.structured_data
+      name: Structured data
+      weight: 15
+      checks:
+      - id: SD-001
+        name: Structured data is valid
+        scope: page
+        method: crawl
+        severity: high
+        weight: 7
+        basis: google
+        source: g_sd_policies
+        test: All JSON-LD parses; no missing required properties for the declared Google-supported types.
+        fix: Fix the parse/validation errors listed (property and path).
+      - id: SD-002
+        name: Structured data matches visible content
+        scope: page
+        method: ai
+        severity: high
+        weight: 6
+        basis: google
+        source: g_sd_policies
+        test: Marked-up facts (names, ratings, FAQs, prices, dates) appear in the visible page.
+        fix: Remove markup describing content users cannot see; this violates Google's structured-data policies.
+      - id: SD-003
+        name: Organization on homepage
+        scope: site
+        method: crawl
+        severity: medium
+        weight: 5
+        basis: google
+        source: g_sd_org
+        test: 'Organization (or subtype) with name, url, logo; recommended: sameAs, address, contactPoint, foundingDate.'
+        fix: Complete the Organization JSON-LD (see GEO-020 for entity-level detail).
+      - id: SD-004
+        name: BreadcrumbList
+        scope: page
+        method: crawl
+        severity: low
+        weight: 3
+        basis: google
+        source: g_sd_breadcrumb
+        test: Non-home pages carry BreadcrumbList matching the visible breadcrumb trail.
+        fix: Add BreadcrumbList generated from the site hierarchy.
+      - id: SD-005
+        name: Page-type schema present
+        scope: page
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: google
+        source: g_sd_intro
+        test: Blog -> Article/BlogPosting; product -> SoftwareApplication/Product; contact -> Organization contactPoint;
+          video -> VideoObject.
+        fix: Add the type mapped to each page group.
+      - id: SD-006
+        name: Deprecated or non-rendering types
+        scope: page
+        method: crawl
+        severity: info
+        weight: 0
+        basis: google
+        source: g_sd_faq
+        test: 'Reports FAQPage (no Google rich result since 7 May 2026), HowTo (removed 2023) and other retired
+          features. Informational: markup is still parsed for understanding.'
+        fix: No removal needed. Do not count on these for SERP enhancements; keep only if the content is genuinely
+          Q&A.
+      - id: SD-007
+        name: Logo meets requirements
+        scope: site
+        method: crawl
+        severity: low
+        weight: 2
+        basis: google
+        source: g_sd_org
+        test: Organization logo >= 112x112 px, crawlable, on a plain background.
+        fix: Provide a compliant logo URL.
+        new_in: 0.2.0
+      - id: SD-008
+        name: No self-serving reviews
+        scope: page
+        method: crawl
+        severity: high
+        weight: 4
+        basis: google
+        source: g_sd_review
+        test: No Review/AggregateRating markup on the business's own Organization/LocalBusiness.
+        fix: Remove the rating markup; it is ineligible and may trigger a manual action.
+        new_in: 0.2.0
+      - id: SD-009
+        name: No conflicting duplicate entities
+        scope: page
+        method: crawl
+        severity: low
+        weight: 3
+        basis: google
+        source: g_sd_policies
+        test: One Organization entity per page (shared @id), no conflicting values between JSON-LD blocks/microdata.
+        fix: Merge into one JSON-LD graph with stable @id values.
+        new_in: 0.2.0
+      - id: SD-010
+        name: JobPosting on careers
+        scope: page
+        method: crawl
+        severity: low
+        weight: 2
+        basis: google
+        source: g_sd_job
+        test: Open roles marked up with JobPosting (title, datePosted, validThrough, hiringOrganization, jobLocation).
+        fix: Add JobPosting per vacancy; remove it when filled.
+        new_in: 0.2.0
+        applies_to:
+        - careers
+      - id: SD-011
+        name: Software/product markup
+        scope: page
+        method: crawl
+        severity: low
+        weight: 3
+        basis: google
+        source: g_sd_software
+        test: Product pages use SoftwareApplication (name, applicationCategory, operatingSystem) or Product.
+        fix: Add the type with accurate properties; omit offers/price if pricing is not public.
+        new_in: 0.2.0
+        applies_to:
+        - products
+    - id: seo.onpage.ux
+      name: Accessibility & UX
+      weight: 5
+      checks:
+      - id: UX-001
+        name: Accessibility basics
+        scope: page
+        method: api:psi
+        severity: low
+        weight: 4
+        basis: industry
+        source: w3c_lang
+        test: Lighthouse accessibility >= 90 pass, 70-89 warn; flags missing labels, contrast, lang.
+        fix: Fix the listed accessibility failures; they overlap with how parsers read the page.
+        new_in: 0.2.0
+      - id: UX-002
+        name: Clear primary CTA
+        scope: page
+        method: ai
+        severity: low
+        weight: 3
+        basis: industry
+        source: g_helpful
+        test: Commercial pages show one clear next step (book demo/contact) above the fold.
+        fix: Add or clarify the primary CTA.
+        new_in: 0.2.0
+      - id: UX-003
+        name: Custom 404 helps users
+        scope: site
+        method: crawl
+        severity: low
+        weight: 2
+        basis: google
+        source: g_http
+        test: 404 page offers navigation/search back into the site.
+        fix: Add links to main sections and search on the 404 template.
+        new_in: 0.2.0
+  - id: seo.offpage
+    name: Off-page SEO
+    weight: 15
+    subsections:
+    - id: seo.offpage.authority
+      name: Authority & backlinks
+      weight: 100
+      note: Free data sources are partial. Scores here are directional; connect Ahrefs/Semrush/Search Console Links
+        for full data.
+      checks:
+      - id: OFF-001
+        name: Domain authority proxy
+        scope: site
+        method: api:openpagerank
+        severity: medium
+        weight: 5
+        basis: industry
+        source: openpagerank
+        test: Open PageRank score benchmarked against up to 5 competitor domains entered in the project.
+        fix: Gap vs competitors is reported; prioritise earning links from the referring domains competitors share
+          (OFF-004).
+      - id: OFF-002
+        name: Referring domains
+        scope: site
+        method: api:commoncrawl
+        severity: medium
+        weight: 5
+        basis: industry
+        source: commoncrawl
+        test: Count of unique linking domains from the latest Common Crawl host graph, vs competitors.
+        fix: Digital PR, partner/customer pages, industry associations and original research are the main levers.
+      - id: OFF-003
+        name: Backlinks to broken pages
+        scope: site
+        method: api:commoncrawl
+        severity: high
+        weight: 6
+        basis: google
+        source: g_redirects
+        test: External links pointing to URLs on the domain that now return 4xx.
+        fix: 301 each listed URL to its closest live equivalent to recover the link equity.
+      - id: OFF-004
+        name: Link gap vs competitors
+        scope: site
+        method: api:commoncrawl
+        severity: low
+        weight: 3
+        basis: industry
+        source: commoncrawl
+        test: Domains linking to >= 2 competitors but not to the project.
+        fix: Outreach list generated from the gap.
+      - id: OFF-005
+        name: Unnatural link patterns
+        scope: site
+        method: api:commoncrawl
+        severity: high
+        weight: 5
+        basis: google
+        source: g_spam
+        test: Flags sitewide footer links from unrelated sites, exact-match commercial anchors > 20% of anchors,
+          links from known link networks.
+        fix: Stop the paid/exchanged link practice; qualify sponsored links with rel='sponsored'.
+      - id: OFF-006
+        name: Unlinked brand mentions
+        scope: site
+        method: ai
+        severity: low
+        weight: 2
+        basis: industry
+        source: g_qrg
+        test: Web pages mentioning the brand without linking (from search results / news).
+        fix: Ask the publishers to add a link to the relevant page.
+      - id: OFF-007
+        name: Anchor text diversity
+        scope: site
+        method: api:commoncrawl
+        severity: medium
+        weight: 3
+        basis: google
+        source: g_spam
+        test: Branded + URL anchors >= 50% of external anchors.
+        fix: Diversify; stop acquiring exact-match commercial anchors.
+        new_in: 0.2.0
+      - id: OFF-008
+        name: Links from topically relevant sites
+        scope: site
+        method: api:commoncrawl
+        severity: medium
+        weight: 3
+        basis: industry
+        source: g_qrg
+        test: Share of referring domains in related industries/regions.
+        fix: Target industry media, partners and regional tech publications.
+        new_in: 0.2.0
+      - id: OFF-009
+        name: Social profiles linked and active
+        scope: site
+        method: crawl
+        severity: low
+        weight: 2
+        basis: industry
+        source: g_sd_org
+        test: Official social profiles linked from the site; last post < 90 days (where public).
+        fix: Link active profiles from the footer and sameAs.
+        new_in: 0.2.0
+      - id: OFF-010
+        name: Brand SERP / knowledge panel (manual)
+        scope: site
+        method: manual
+        severity: low
+        weight: 2
+        basis: google
+        source: g_knowledge_panel
+        test: Branded search shows the official site first and a knowledge panel.
+        fix: Claim the knowledge panel; strengthen entity signals (GEO-020/021).
+        new_in: 0.2.0
+- id: geo
+  name: GEO (Generative Engine Optimization)
+  note: 'Google states there are no additional requirements for appearing in AI Overviews / AI Mode beyond normal
+    SEO eligibility (indexed, snippet-eligible). Checks marked `industry` reflect observed behaviour of AI search
+    systems and are labelled as such in the report.
+
+    '
+  sections:
+  - id: geo.access
+    name: AI crawler access
+    weight: 20
+    subsections:
+    - id: geo.access.bots
+      name: Bot access
+      weight: 100
+      checks:
+      - id: GEO-001
+        name: Eligible for Google AI features
+        scope: page
+        method: crawl
+        severity: critical
+        weight: 10
+        basis: google
+        source: g_ai_features
+        test: 'Page indexable and snippet-eligible: no nosnippet, max-snippet:0, or data-nosnippet over main content.'
+        fix: Remove the snippet restriction from the listed pages; AI Overviews only use content eligible for a
+          snippet.
+      - id: GEO-002
+        name: OAI-SearchBot allowed (ChatGPT search)
+        scope: site
+        method: crawl
+        severity: high
+        weight: 8
+        basis: platform
+        source: openai_bots
+        test: robots.txt does not disallow OAI-SearchBot for public pages.
+        fix: Allow OAI-SearchBot; blocking it removes the site from ChatGPT search answers and citations.
+      - id: GEO-003
+        name: ChatGPT-User allowed
+        scope: site
+        method: crawl
+        severity: medium
+        weight: 5
+        basis: platform
+        source: openai_bots
+        test: ChatGPT-User not disallowed (user-initiated fetches).
+        fix: Allow ChatGPT-User so pages shared or requested inside ChatGPT can be read.
+      - id: GEO-004
+        name: PerplexityBot allowed
+        scope: site
+        method: crawl
+        severity: high
+        weight: 6
+        basis: platform
+        source: perplexity_bots
+        test: PerplexityBot not disallowed.
+        fix: Allow PerplexityBot to be indexed and cited by Perplexity.
+      - id: GEO-005
+        name: Claude crawlers allowed
+        scope: site
+        method: crawl
+        severity: medium
+        weight: 5
+        basis: platform
+        source: anthropic_bots
+        test: Claude-SearchBot and Claude-User not disallowed. ClaudeBot (training) reported separately as a policy
+          choice.
+        fix: Allow Claude-SearchBot/Claude-User for search visibility; decide on ClaudeBot by training policy.
+      - id: GEO-006
+        name: Bingbot allowed
+        scope: site
+        method: crawl
+        severity: high
+        weight: 6
+        basis: platform
+        source: bing_guidelines
+        test: Bingbot not disallowed; site returns 200 to Bingbot UA.
+        fix: Allow Bingbot; Bing's index feeds Copilot and is used by several AI assistants.
+      - id: GEO-007
+        name: Training crawlers policy (informational)
+        scope: site
+        method: crawl
+        severity: info
+        weight: 0
+        basis: google
+        source: g_crawlers
+        test: 'Reports the status of GPTBot, Google-Extended, CCBot, ClaudeBot, Applebot-Extended. Note: Google-Extended
+          does not affect Search or AI Overviews.'
+        fix: Policy decision for the business; the report explains the effect of each.
+      - id: GEO-008
+        name: WAF/CDN does not block AI user agents
+        scope: site
+        method: crawl
+        severity: high
+        weight: 7
+        basis: industry
+        source: openai_bots
+        test: Homepage and one key page fetched with each AI search UA return 200 (not 403/429/challenge page).
+        fix: Whitelist the verified bot IP ranges in the CDN/bot-protection settings (Cloudflare 'AI bots' setting
+          often blocks them by default).
+      - id: GEO-009
+        name: Other AI assistants allowed
+        scope: site
+        method: crawl
+        severity: low
+        weight: 3
+        basis: platform
+        source: ai_bots_misc
+        test: Applebot (Siri/Spotlight), Meta-ExternalFetcher, DuckAssistBot, MistralAI-User, Amazonbot not disallowed
+          (training variants reported separately).
+        fix: Allow the search/user-fetch agents you want visibility in.
+        new_in: 0.2.0
+      - id: GEO-010
+        name: Bot access consistent across language versions
+        scope: project
+        method: crawl
+        severity: medium
+        weight: 3
+        basis: industry
+        source: g_robots
+        test: /ar/ and /en paths receive identical AI-bot rules (no locale path accidentally disallowed).
+        fix: Align the robots rules for every language prefix.
+        new_in: 0.2.0
+  - id: geo.rendering
+    name: Machine readability
+    weight: 10
+    subsections:
+    - id: geo.rendering.html
+      name: Server HTML
+      weight: 100
+      checks:
+      - id: GEO-011
+        name: Content readable without JavaScript
+        scope: page
+        method: render
+        severity: high
+        weight: 8
+        basis: industry
+        source: g_js
+        test: Raw HTML (no JS) contains the main content, headings and key facts (>= 80% of rendered text).
+        fix: Most AI crawlers do not execute JavaScript. Server-render the content shown in the report as JS-only.
+      - id: GEO-012
+        name: Semantic HTML structure
+        scope: page
+        method: crawl
+        severity: low
+        weight: 3
+        basis: industry
+        source: w3c_lang
+        test: Main content inside <main>/<article>; lists as <ul>/<ol>; tables as <table> with header cells.
+        fix: Use semantic elements so parsers can segment passages reliably.
+      - id: GEO-013
+        name: llms.txt (informational)
+        scope: site
+        method: crawl
+        severity: info
+        weight: 0
+        basis: industry
+        source: llmstxt
+        test: 'Reports presence and validity of /llms.txt. Not scored: no major AI search system has confirmed using
+          it.'
+        fix: Optional. Low effort; no expected ranking or citation effect.
+      - id: GEO-014
+        name: Video and audio have transcripts
+        scope: page
+        method: crawl
+        severity: low
+        weight: 3
+        basis: industry
+        source: g_video
+        test: Pages with video/podcast provide a text transcript or detailed summary.
+        fix: Publish transcripts; AI systems read text, not media.
+        new_in: 0.2.0
+      - id: GEO-015
+        name: Key facts not locked in images/PDF only
+        scope: page
+        method: ai
+        severity: medium
+        weight: 4
+        basis: industry
+        source: g_images
+        test: Statistics, pricing tiers, comparisons available as HTML text, not only inside images or PDFs.
+        fix: Reproduce the facts as HTML text/tables.
+        new_in: 0.2.0
+  - id: geo.entity
+    name: Brand entity
+    weight: 15
+    subsections:
+    - id: geo.entity.identity
+      name: Entity clarity
+      weight: 100
+      checks:
+      - id: GEO-020
+        name: Complete Organization entity
+        scope: site
+        method: crawl
+        severity: high
+        weight: 7
+        basis: google
+        source: g_sd_org
+        test: Organization JSON-LD with name, alternateName (other-language name), url, logo, description, foundingDate,
+          address, contactPoint, sameAs (>= 3 authoritative profiles).
+        fix: Complete the missing properties; use the same @id across both language versions.
+      - id: GEO-021
+        name: sameAs to authoritative profiles
+        scope: site
+        method: crawl
+        severity: medium
+        weight: 5
+        basis: industry
+        source: g_sd_org
+        test: 'sameAs includes LinkedIn plus at least two of: Wikidata, Crunchbase, X, YouTube, GitHub, official
+          registries.'
+        fix: Add the missing profiles; create a Wikidata item if the brand qualifies for notability.
+      - id: GEO-022
+        name: Consistent brand naming
+        scope: project
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: industry
+        source: g_site_names
+        test: Brand name spelled identically in titles, schema, footer and About across pages and per language (e.g.
+          'WideBot' / 'وايدبوت'); variants flagged.
+        fix: Normalise every listed variant to the official spelling.
+      - id: GEO-023
+        name: Fact-rich About page
+        scope: site
+        method: ai
+        severity: medium
+        weight: 5
+        basis: google
+        source: g_qrg
+        test: About page states what the company does, founding year, HQ, leadership, scale (customers, markets)
+          in plain declarative sentences.
+        fix: Add the missing facts as explicit statements AI systems can quote.
+      - id: GEO-024
+        name: Leadership with Person entities
+        scope: site
+        method: crawl
+        severity: low
+        weight: 3
+        basis: industry
+        source: g_qrg
+        test: Leadership page lists people with role, and Person schema with sameAs (LinkedIn).
+        fix: Add Person markup linked to the Organization via worksFor/founder.
+      - id: GEO-025
+        name: One clear page per product/entity
+        scope: language
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: industry
+        source: g_helpful
+        test: Each product/service has exactly one canonical page that defines it.
+        fix: Consolidate overlapping product pages.
+        new_in: 0.2.0
+      - id: GEO-026
+        name: Facts consistent across the web
+        scope: site
+        method: ai
+        severity: medium
+        weight: 4
+        basis: industry
+        source: g_qrg
+        test: Founding year, HQ, leadership, offering match between site, LinkedIn, Crunchbase, Wikidata and press.
+        fix: Correct outdated facts on the listed external profiles.
+        new_in: 0.2.0
+  - id: geo.eeat
+    name: E-E-A-T & trust
+    weight: 15
+    subsections:
+    - id: geo.eeat.trust
+      name: Trust signals
+      weight: 100
+      checks:
+      - id: GEO-030
+        name: Contact transparency
+        scope: site
+        method: crawl
+        severity: high
+        weight: 6
+        basis: google
+        source: g_qrg
+        test: Contact page with email/phone/address, linked sitewide.
+        fix: Add complete contact details and link the page from the footer.
+      - id: GEO-031
+        name: Evidence of experience
+        scope: language
+        method: ai
+        severity: medium
+        weight: 6
+        basis: google
+        source: g_helpful
+        test: Case studies/success stories with named clients and measurable outcomes.
+        fix: Publish case studies with concrete numbers (before/after, timeframe, client).
+      - id: GEO-032
+        name: Third-party validation
+        scope: site
+        method: ai
+        severity: medium
+        weight: 4
+        basis: google
+        source: g_qrg
+        test: Certifications, awards, partner badges, press coverage linked to their source.
+        fix: Display each credential with a link to the issuing body or article.
+      - id: GEO-033
+        name: Editorial and policy pages
+        scope: site
+        method: crawl
+        severity: low
+        weight: 3
+        basis: google
+        source: g_qrg
+        test: Privacy policy, terms and (for content sites) editorial/AI-use policy reachable.
+        fix: Publish and link the missing policies.
+      - id: GEO-034
+        name: Author expertise on informational content
+        scope: language
+        method: ai
+        severity: medium
+        weight: 5
+        basis: google
+        source: g_helpful
+        test: Informational articles attributed to identifiable people with relevant expertise (aggregates BLOG-001/002).
+        fix: Attribute articles to subject-matter experts and show their credentials.
+  - id: geo.citability
+    name: Citability
+    weight: 15
+    subsections:
+    - id: geo.citability.passages
+      name: Passage quality
+      weight: 100
+      checks:
+      - id: GEO-040
+        name: Answer-first introductions
+        scope: page
+        method: ai
+        severity: high
+        weight: 7
+        basis: industry
+        source: g_ai_features
+        test: The first 2-3 sentences answer the page's core question or state its value proposition directly.
+        fix: Rewrite the opening of each listed page to lead with the answer; the report shows a proposed opening.
+      - id: GEO-041
+        name: Self-contained passages
+        scope: page
+        method: ai
+        severity: medium
+        weight: 6
+        basis: industry
+        source: g_ai_features
+        test: Sections under each H2 can be understood without surrounding context (no 'as mentioned above', explicit
+          subject names).
+        fix: Restate the subject in each section and avoid dangling references.
+      - id: GEO-042
+        name: Factual density
+        scope: page
+        method: ai
+        severity: medium
+        weight: 6
+        basis: industry
+        source: g_helpful
+        test: Concrete, verifiable facts (numbers, dates, named entities) per 100 words vs page-type baseline.
+        fix: Replace generic claims with specific figures and named examples.
+      - id: GEO-043
+        name: Original information
+        scope: page
+        method: ai
+        severity: medium
+        weight: 5
+        basis: google
+        source: g_helpful
+        test: Page contains first-party data, expert quotes or a distinct point of view not found in competing pages.
+        fix: Add proprietary data, customer results or expert commentary.
+      - id: GEO-044
+        name: Sourced claims
+        scope: page
+        method: ai
+        severity: low
+        weight: 3
+        basis: industry
+        source: g_qrg
+        test: Statistics and regulatory claims carry a cited source.
+        fix: Link each statistic to its primary source.
+      - id: GEO-045
+        name: Topic coverage (query fan-out)
+        scope: page
+        method: ai
+        severity: medium
+        weight: 5
+        basis: industry
+        source: g_ai_features
+        test: AI generates the sub-questions a user would ask about the page topic and checks which are answered.
+        fix: Add sections for the unanswered sub-questions listed (or link to pages that answer them).
+      - id: GEO-046
+        name: Statistics and data tables
+        scope: page
+        method: crawl
+        severity: low
+        weight: 3
+        basis: industry
+        source: g_helpful
+        test: Pages with quantitative claims present data in tables/lists with units and dates.
+        fix: Structure figures as tables with source and date.
+        new_in: 0.2.0
+      - id: GEO-047
+        name: Comparison and alternatives content
+        scope: language
+        method: ai
+        severity: medium
+        weight: 4
+        basis: industry
+        source: g_helpful
+        test: Site covers 'X vs Y', 'best tools for…', 'alternatives to…' queries relevant to its category, fairly
+          and factually.
+        fix: Publish honest comparison pages for the top competitor queries.
+        new_in: 0.2.0
+      - id: GEO-048
+        name: Key takeaways / summary block
+        scope: page
+        method: crawl
+        severity: low
+        weight: 3
+        basis: industry
+        source: g_snippet
+        test: Long pages (> 1,200 words) start or end with a short summary/TL;DR.
+        fix: Add a 3-5 point summary.
+        new_in: 0.2.0
+      - id: GEO-049
+        name: Visible last-updated date on informational pages
+        scope: page
+        method: crawl
+        severity: low
+        weight: 3
+        basis: google
+        source: g_dates
+        test: Informational pages display an updated date.
+        fix: Show 'Updated on' and keep it truthful.
+        new_in: 0.2.0
+  - id: geo.visibility
+    name: AI answer visibility
+    weight: 15
+    note: 'Measured by querying AI engines with a prompt set defined per project. Free tier: Gemini API with Google
+      Search grounding; other engines optional/paid or manual.'
+    subsections:
+    - id: geo.visibility.answers
+      name: Mentions & citations
+      weight: 100
+      checks:
+      - id: GEO-050
+        name: Brand mentioned in AI answers
+        scope: language
+        method: ai
+        severity: high
+        weight: 8
+        basis: industry
+        source: g_ai_features
+        test: Share of project prompts where the brand is named in the answer (per engine, per language).
+        fix: Prompts where the brand is absent are listed with the competitors named instead.
+        new_in: 0.2.0
+      - id: GEO-051
+        name: Site cited as a source
+        scope: language
+        method: ai
+        severity: high
+        weight: 8
+        basis: industry
+        source: g_ai_features
+        test: Share of prompts where a project URL is among cited sources.
+        fix: 'For each missed prompt, the cited pages are listed: compare and close the content gap.'
+        new_in: 0.2.0
+      - id: GEO-052
+        name: AI share of voice vs competitors
+        scope: language
+        method: ai
+        severity: medium
+        weight: 6
+        basis: industry
+        source: g_ai_features
+        test: Brand mentions / all tracked-brand mentions across prompts.
+        fix: Prioritise topics where competitors dominate.
+        new_in: 0.2.0
+      - id: GEO-053
+        name: Answer accuracy about the brand
+        scope: language
+        method: ai
+        severity: medium
+        weight: 5
+        basis: industry
+        source: g_qrg
+        test: AI descriptions of the brand match the facts on the About page (no wrong product, outdated positioning).
+        fix: Correct the source pages AI cites for the wrong facts; strengthen GEO-023/026.
+        new_in: 0.2.0
+      - id: GEO-054
+        name: AI referral traffic
+        scope: site
+        method: api:gsc
+        severity: low
+        weight: 2
+        basis: industry
+        source: g_gsc
+        test: Sessions from chatgpt.com, perplexity.ai, gemini.google.com, copilot.microsoft.com tracked (GA4) and
+          trending.
+        fix: Create an 'AI referrals' channel group in GA4.
+        new_in: 0.2.0
+  - id: geo.presence
+    name: Off-site presence
+    weight: 10
+    subsections:
+    - id: geo.presence.platforms
+      name: Platforms AI engines cite
+      weight: 100
+      checks:
+      - id: GEO-060
+        name: Wikipedia / Wikidata
+        scope: site
+        method: api:commoncrawl
+        severity: medium
+        weight: 5
+        basis: industry
+        source: wikidata
+        test: Wikidata item exists (and Wikipedia article where notable) with correct facts.
+        fix: Create/curate the Wikidata item with references; do not self-write Wikipedia.
+        new_in: 0.2.0
+      - id: GEO-061
+        name: Review & directory platforms
+        scope: site
+        method: manual
+        severity: medium
+        weight: 5
+        basis: industry
+        source: g_qrg
+        test: Profiles on category-relevant platforms (e.g. G2, Capterra, Clutch, Gartner Peer Insights) with recent
+          reviews.
+        fix: Claim profiles and run a review programme.
+        new_in: 0.2.0
+      - id: GEO-062
+        name: Community discussions
+        scope: site
+        method: ai
+        severity: low
+        weight: 3
+        basis: industry
+        source: g_qrg
+        test: Brand discussed on Reddit, Quora, LinkedIn posts, Stack Overflow for the category.
+        fix: Participate transparently; publish expert answers from named staff.
+        new_in: 0.2.0
+      - id: GEO-063
+        name: YouTube presence
+        scope: site
+        method: manual
+        severity: low
+        weight: 3
+        basis: industry
+        source: g_video
+        test: Official channel with titled, described, transcribed videos on core topics.
+        fix: Publish explainer/demo videos with full descriptions and chapters.
+        new_in: 0.2.0
+      - id: GEO-064
+        name: Press and analyst coverage
+        scope: site
+        method: ai
+        severity: medium
+        weight: 4
+        basis: industry
+        source: g_qrg
+        test: Recent (12 months) coverage in industry/regional media.
+        fix: Digital PR around launches, data and partnerships.
+        new_in: 0.2.0
+- id: aeo
+  name: AEO (Answer Engine Optimization)
+  sections:
+  - id: aeo.formats
+    name: Answer formats
+    weight: 50
+    subsections:
+    - id: aeo.formats.snippets
+      name: Snippet-ready content
+      weight: 100
+      checks:
+      - id: AEO-001
+        name: Question-phrased headings
+        scope: page
+        applies_to:
+        - blog
+        - solutions
+        - products
+        method: crawl
+        severity: medium
+        weight: 5
+        basis: industry
+        source: g_snippet
+        test: At least 2 H2/H3 phrased as natural questions (what/how/why/... / ما/كيف/لماذا/هل...).
+        fix: Rephrase section headings that correspond to real user questions.
+      - id: AEO-002
+        name: Direct answer under question headings
+        scope: page
+        method: crawl
+        severity: high
+        weight: 7
+        basis: industry
+        source: g_snippet
+        test: Paragraph of 40-60 words immediately after each question heading that answers it without preamble.
+        fix: Insert a concise answer paragraph right below each listed heading, then elaborate.
+      - id: AEO-003
+        name: Definition statement
+        scope: page
+        applies_to:
+        - blog
+        - glossary
+        method: ai
+        severity: medium
+        weight: 5
+        basis: industry
+        source: g_snippet
+        test: Definitional pages contain an 'X is ...' sentence in the first paragraph.
+        fix: Open with a one-sentence definition.
+      - id: AEO-004
+        name: Steps as ordered lists
+        scope: page
+        method: crawl
+        severity: low
+        weight: 3
+        basis: industry
+        source: g_snippet
+        test: Procedural content (how-to, setup, steps) uses <ol>.
+        fix: Convert step sequences written as paragraphs into ordered lists.
+      - id: AEO-005
+        name: Comparisons as tables
+        scope: page
+        method: crawl
+        severity: low
+        weight: 3
+        basis: industry
+        source: g_snippet
+        test: Comparison content (vs, types, pricing tiers) uses HTML <table>.
+        fix: Present comparisons in a real HTML table.
+      - id: AEO-006
+        name: FAQ section on commercial pages
+        scope: page
+        applies_to:
+        - solutions
+        - products
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: industry
+        source: g_sd_faq
+        test: Visible FAQ block answering pre-sales questions. Scored as content; FAQPage markup itself earns no
+          Google rich result.
+        fix: Add a FAQ section covering objections and decision questions.
+      - id: AEO-007
+        name: Snippet controls not restrictive
+        scope: page
+        method: crawl
+        severity: high
+        weight: 6
+        basis: google
+        source: g_robots_meta
+        test: No max-snippet < 50, nosnippet or data-nosnippet on answer content.
+        fix: Relax the snippet directive on the listed pages.
+      - id: AEO-008
+        name: Jump links to sections
+        scope: page
+        method: crawl
+        severity: low
+        weight: 2
+        basis: google
+        source: g_snippet
+        test: Long pages have id anchors on H2s linked from a TOC.
+        fix: Add anchor ids and a TOC.
+        new_in: 0.2.0
+      - id: AEO-009
+        name: Video key moments
+        scope: page
+        method: crawl
+        severity: low
+        weight: 2
+        basis: google
+        source: g_video
+        test: Videos expose chapters (Clip or SeekToAction in VideoObject, or YouTube chapters).
+        fix: Add chapters/Clip markup.
+        new_in: 0.2.0
+      - id: AEO-013
+        name: Glossary/definition pages
+        scope: language
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: industry
+        source: g_helpful
+        test: Category terms have dedicated definition pages (e.g. encyclopedia) linked from related content.
+        fix: Create one definition page per core term and link it contextually.
+        new_in: 0.2.0
+      - id: AEO-014
+        name: Question in title for informational pages
+        scope: page
+        method: crawl
+        severity: low
+        weight: 2
+        basis: industry
+        source: g_title
+        test: Informational posts targeting a question use it in the title/H1.
+        fix: Use the natural question as the H1 where it matches intent.
+        new_in: 0.2.0
+        applies_to:
+        - blog
+  - id: aeo.coverage
+    name: Question coverage
+    weight: 30
+    subsections:
+    - id: aeo.coverage.questions
+      name: Question coverage
+      weight: 100
+      checks:
+      - id: AEO-010
+        name: Long-tail question coverage
+        scope: language
+        method: ai
+        severity: medium
+        weight: 6
+        basis: industry
+        source: g_helpful
+        test: For each main topic, the share of common who/what/how/why questions answered somewhere on the site.
+        fix: Unanswered questions listed with the best page to host each answer.
+      - id: AEO-011
+        name: Conversational phrasing
+        scope: page
+        method: ai
+        severity: low
+        weight: 3
+        basis: industry
+        source: g_helpful
+        test: Answers phrased in natural language that reads well aloud (voice assistants).
+        fix: Rewrite jargon-heavy answer paragraphs in plain sentences.
+      - id: AEO-012
+        name: QAPage for genuine Q&A
+        scope: page
+        method: crawl
+        severity: info
+        weight: 0
+        basis: google
+        source: g_sd_qapage
+        test: Reports community/forum Q&A pages lacking QAPage markup.
+        fix: Use QAPage only where users submit questions and answers.
+  - id: aeo.serp
+    name: SERP answer features
+    weight: 20
+    note: 'Needs search data: Search Console (free, own sites) or an optional SERP API.'
+    subsections:
+    - id: aeo.serp.features
+      name: Feature ownership
+      weight: 100
+      checks:
+      - id: AEO-020
+        name: Featured snippets owned
+        scope: language
+        method: api:serp
+        severity: medium
+        weight: 5
+        basis: google
+        source: g_featured
+        test: Queries where the site holds the featured snippet vs queries where it ranks top 5 with a snippet present.
+        fix: For each lost snippet, match the format (paragraph/list/table) of the current holder with a better
+          answer.
+        new_in: 0.2.0
+      - id: AEO-021
+        name: People Also Ask coverage
+        scope: language
+        method: api:serp
+        severity: medium
+        weight: 5
+        basis: industry
+        source: g_snippet
+        test: Share of PAA questions on target queries answered on the site.
+        fix: Add answers for the unanswered PAA questions listed.
+        new_in: 0.2.0
+      - id: AEO-022
+        name: AI Overview presence
+        scope: language
+        method: api:serp
+        severity: medium
+        weight: 5
+        basis: google
+        source: g_ai_features
+        test: Target queries showing an AI Overview, and whether the site is cited in it.
+        fix: Strengthen the pages for queries where competitors are cited.
+        new_in: 0.2.0
+      - id: AEO-023
+        name: Queries phrased as questions (GSC)
+        scope: language
+        method: api:gsc
+        severity: low
+        weight: 3
+        basis: industry
+        source: g_gsc
+        test: Question-form queries bringing impressions but CTR < 2% identified.
+        fix: Add direct answers for these queries on the ranking page.
+        new_in: 0.2.0
+- id: local
+  name: Local SEO
+  applicable_when: Project marks the business as having physical locations or serving specific cities/countries.
+    Otherwise N/A.
+  sections:
+  - id: local.gbp
+    name: Google Business Profile
+    weight: 35
+    subsections:
+    - id: local.gbp.profile
+      name: Profile
+      weight: 100
+      note: Reviewed manually against the live Google Business Profile; gaps go into the client plan per domain
+        and industry.
+      checks:
+      - id: LOC-001
+        name: Profile found for each location
+        scope: site
+        method: manual
+        severity: critical
+        weight: 10
+        basis: google
+        source: gbp_guidelines
+        test: A Places result matches each configured location (name + address).
+        fix: Create or claim the profile and verify it in Google Business Profile.
+      - id: LOC-002
+        name: Business name compliant
+        scope: site
+        method: manual
+        severity: high
+        weight: 6
+        basis: google
+        source: gbp_guidelines
+        test: Profile name equals the real-world brand name; no added keywords or locations.
+        fix: Remove the added descriptors; keyword-stuffed names risk suspension.
+      - id: LOC-003
+        name: Relevant primary category
+        scope: site
+        method: manual
+        severity: high
+        weight: 6
+        basis: google
+        source: gbp_ranking
+        test: Primary type matches the core business (e.g. Software company).
+        fix: Change the primary category to the most specific accurate one.
+      - id: LOC-004
+        name: Website link points to the right page
+        scope: site
+        method: manual
+        severity: medium
+        weight: 4
+        basis: industry
+        source: gbp_guidelines
+        test: Profile website URL returns 200 and targets the localized page/language for that location.
+        fix: Update the website field (e.g. Riyadh profile -> Arabic site or Saudi location page).
+      - id: LOC-005
+        name: Phone and hours set
+        scope: site
+        method: manual
+        severity: medium
+        weight: 4
+        basis: google
+        source: gbp_ranking
+        test: Phone number and regular opening hours present.
+        fix: Complete the missing fields in the profile.
+      - id: LOC-006
+        name: Reviews volume and rating
+        scope: site
+        method: manual
+        severity: medium
+        weight: 5
+        basis: google
+        source: gbp_ranking
+        test: Rating and review count benchmarked against competitors entered in the project; most recent review
+          < 90 days.
+        fix: Set up a review-request flow after onboarding/implementation milestones.
+      - id: LOC-007
+        name: Photos
+        scope: site
+        method: manual
+        severity: low
+        weight: 2
+        basis: industry
+        source: gbp_guidelines
+        test: '>= 10 photos including logo, office exterior/interior and team.'
+        fix: Upload current, real photos.
+      - id: LOC-008
+        name: Business description
+        scope: site
+        method: manual
+        severity: low
+        weight: 2
+        basis: google
+        source: gbp_guidelines
+        test: Description filled (up to 750 chars), accurate, no links/promos.
+        fix: Write a factual description.
+        new_in: 0.2.0
+      - id: LOC-009
+        name: Services/products listed
+        scope: site
+        method: manual
+        severity: low
+        weight: 2
+        basis: google
+        source: gbp_guidelines
+        test: Services or products section populated.
+        fix: Add the core services.
+        new_in: 0.2.0
+      - id: LOC-009B
+        name: Recent posts/updates
+        scope: site
+        method: manual
+        severity: low
+        weight: 2
+        basis: industry
+        source: gbp_ranking
+        test: At least one profile update in the last 30 days.
+        fix: Post launches, events or news monthly.
+        new_in: 0.2.0
+      - id: LOC-009C
+        name: Owner responses to reviews
+        scope: site
+        method: manual
+        severity: medium
+        weight: 3
+        basis: google
+        source: gbp_ranking
+        test: Owner replied to >= 80% of reviews from the last 12 months.
+        fix: Reply to every review, especially negative ones.
+        new_in: 0.2.0
+      - id: LOC-009D
+        name: Name in both languages where relevant
+        scope: site
+        method: manual
+        severity: low
+        weight: 2
+        basis: industry
+        source: gbp_guidelines
+        test: For Arabic-market locations, the profile shows the brand consistently in Arabic and English (as used
+          on signage/registration).
+        fix: Align the profile name with the official registered/branded form.
+        new_in: 0.2.0
+  - id: local.nap
+    name: NAP consistency
+    weight: 25
+    subsections:
+    - id: local.nap.consistency
+      name: Name, Address, Phone
+      weight: 100
+      checks:
+      - id: LOC-010
+        name: NAP visible on the site
+        scope: site
+        method: crawl
+        severity: high
+        weight: 6
+        basis: industry
+        source: gbp_ranking
+        test: Name, address and phone present as text (not image) in footer or contact page.
+        fix: Add the NAP block as HTML text.
+      - id: LOC-011
+        name: NAP matches the profile
+        scope: site
+        method: manual
+        severity: high
+        weight: 7
+        basis: industry
+        source: gbp_ranking
+        test: Site NAP equals the Places data after normalisation (phone in E.164, address tokens).
+        fix: Align the listed fields on the site or the profile.
+      - id: LOC-012
+        name: NAP consistent across languages
+        scope: project
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: industry
+        source: gbp_ranking
+        test: Same phone/address (transliterated) on every language version.
+        fix: Use one source for NAP in all templates.
+      - id: LOC-013
+        name: Click-to-call
+        scope: site
+        method: crawl
+        severity: low
+        weight: 2
+        basis: industry
+        source: g_seo_starter
+        test: 'Phone wrapped in tel: link.'
+        fix: Wrap phone numbers in <a href='tel:+...'>.
+  - id: local.schema
+    name: Local structured data
+    weight: 15
+    subsections:
+    - id: local.schema.markup
+      name: LocalBusiness markup
+      weight: 100
+      checks:
+      - id: LOC-020
+        name: LocalBusiness/Organization address markup
+        scope: site
+        method: crawl
+        severity: medium
+        weight: 6
+        basis: google
+        source: g_sd_local
+        test: PostalAddress (streetAddress, addressLocality, addressCountry) and telephone in markup for each location.
+        fix: Add LocalBusiness (or Organization with location) per office.
+      - id: LOC-021
+        name: Geo coordinates and hours
+        scope: site
+        method: crawl
+        severity: low
+        weight: 3
+        basis: google
+        source: g_sd_local
+        test: geo (latitude/longitude) and openingHoursSpecification present.
+        fix: Add coordinates and opening hours consistent with the profile.
+  - id: local.pages
+    name: Location pages
+    weight: 15
+    subsections:
+    - id: local.pages.content
+      name: Location content
+      weight: 100
+      checks:
+      - id: LOC-030
+        name: Dedicated location pages
+        scope: site
+        method: crawl
+        severity: medium
+        weight: 5
+        basis: industry
+        source: gbp_ranking
+        test: Each served city/country has a page with unique content (local clients, team, address, map).
+        fix: Create one substantive page per location; avoid templated doorway pages (see CONT-005).
+      - id: LOC-031
+        name: Embedded map
+        scope: site
+        method: crawl
+        severity: low
+        weight: 1
+        basis: industry
+        source: gbp_ranking
+        test: Contact/location page embeds a map of the address.
+        fix: Embed the Google Maps location of the office.
+  - id: local.citations
+    name: Citations & other maps
+    weight: 10
+    subsections:
+    - id: local.citations.listings
+      name: Listings
+      weight: 100
+      checks:
+      - id: LOC-040
+        name: Apple Business Connect / Bing Places
+        scope: site
+        method: manual
+        severity: low
+        weight: 3
+        basis: platform
+        source: bing_places
+        test: Location listed on Apple Maps and Bing Places with the same NAP.
+        fix: Claim both listings.
+        new_in: 0.2.0
+      - id: LOC-041
+        name: Local directories consistency
+        scope: site
+        method: manual
+        severity: low
+        weight: 3
+        basis: industry
+        source: gbp_ranking
+        test: Top regional directories/chambers list the business with identical NAP.
+        fix: Correct inconsistent listings.
+        new_in: 0.2.0
+      - id: LOC-042
+        name: Local backlinks
+        scope: site
+        method: api:commoncrawl
+        severity: low
+        weight: 2
+        basis: industry
+        source: gbp_ranking
+        test: Links from local media, associations, universities in each served city.
+        fix: Pursue local partnerships and sponsorships.
+        new_in: 0.2.0
+- id: vertical
+  name: Site-type modules
+  note: Each module runs only when the project site type matches (auto-detected, editable). Active modules are averaged;
+    if none is active the pillar is N/A.
+  sections:
+  - id: vertical.ecommerce
+    name: E-commerce
+    weight: 100
+    applicable_when: site type = e-commerce
+    subsections:
+    - id: vertical.ecommerce.core
+      name: E-commerce checks
+      weight: 100
+      note: Active only when site type = e-commerce
+      checks:
+      - id: ECOM-001
+        name: Product structured data
+        scope: page
+        method: crawl
+        severity: high
+        weight: 8
+        basis: google
+        source: g_sd_product
+        test: Product pages carry Product with name, image, and offers (price, priceCurrency, availability).
+        fix: Add complete Product JSON-LD generated from the catalogue data.
+        new_in: 0.3.0
+      - id: ECOM-002
+        name: Merchant listing details
+        scope: page
+        method: crawl
+        severity: medium
+        weight: 5
+        basis: google
+        source: g_sd_merchant
+        test: Offers include shippingDetails and hasMerchantReturnPolicy (or these are declared at Organization
+          level).
+        fix: Add shipping and return policy markup, or configure them in Merchant Center.
+        new_in: 0.3.0
+      - id: ECOM-003
+        name: Markup price and stock match the page
+        scope: page
+        method: ai
+        severity: high
+        weight: 7
+        basis: google
+        source: g_sd_policies
+        test: Price, currency and availability in JSON-LD equal the visible values.
+        fix: Generate markup from the same source as the visible price; mismatches cause disapprovals.
+        new_in: 0.3.0
+      - id: ECOM-004
+        name: Product reviews markup is genuine
+        scope: page
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: google
+        source: g_sd_review
+        test: AggregateRating/Review only where reviews are visible on the page and collected from customers.
+        fix: Remove rating markup with no visible reviews.
+        new_in: 0.3.0
+      - id: ECOM-005
+        name: Out-of-stock and discontinued handling
+        scope: page
+        method: crawl
+        severity: high
+        weight: 6
+        basis: google
+        source: g_ecom
+        test: Temporarily unavailable products return 200 with OutOfStock; discontinued ones return 404/410 or 301
+          to a direct successor, not the homepage.
+        fix: Apply the rule per product state; mass redirects to the homepage are treated as soft 404.
+        new_in: 0.3.0
+      - id: ECOM-006
+        name: Faceted navigation controlled
+        scope: site
+        method: crawl
+        severity: high
+        weight: 7
+        basis: google
+        source: g_faceted
+        test: Filter/sort URL combinations are not crawlable at scale (blocked in robots.txt or use URL fragments)
+          and are canonicalised.
+        fix: Block low-value facet parameters and keep only facets with search demand as indexable pages.
+        new_in: 0.3.0
+      - id: ECOM-007
+        name: Category pages have unique content
+        scope: page
+        method: crawl
+        severity: medium
+        weight: 5
+        basis: industry
+        source: g_helpful
+        test: Category pages are indexable, have a unique H1, intro text and are not near-duplicates of each other.
+        fix: Write a short unique intro and buying guidance per category.
+        new_in: 0.3.0
+      - id: ECOM-008
+        name: Product variants handled
+        scope: page
+        method: crawl
+        severity: medium
+        weight: 5
+        basis: google
+        source: g_sd_variants
+        test: Variants (size, colour) use ProductGroup or one canonical URL; no duplicate indexable page per variant
+          without unique demand.
+        fix: Canonicalise variants to the main product or mark them up with ProductGroup.
+        new_in: 0.3.0
+      - id: ECOM-009
+        name: Unique product descriptions
+        scope: page
+        method: ai
+        severity: medium
+        weight: 5
+        basis: google
+        source: g_helpful
+        test: Descriptions are not copied manufacturer text shared with other retailers (duplicate detection across
+          the site and sampled web results).
+        fix: Rewrite descriptions for top-revenue products first.
+        new_in: 0.3.0
+      - id: ECOM-010
+        name: Category pagination crawlable
+        scope: site
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: google
+        source: g_pagination
+        test: Paginated category pages are reachable through <a href> links and self-canonical.
+        fix: Add crawlable pagination links; do not canonicalise page 2+ to page 1.
+        new_in: 0.3.0
+      - id: ECOM-011
+        name: Product images
+        scope: page
+        method: crawl
+        severity: low
+        weight: 3
+        basis: google
+        source: g_images
+        test: At least one high-resolution image (>= 800 px) per product with descriptive alt; multiple angles recommended.
+        fix: Upload larger images and write product-specific alt text.
+        new_in: 0.3.0
+      - id: ECOM-012
+        name: Merchant Center feed (manual)
+        scope: site
+        method: manual
+        severity: medium
+        weight: 4
+        basis: google
+        source: gmc
+        test: Products submitted to Google Merchant Center with no account-level issues.
+        fix: Create the feed and fix disapprovals to appear in free listings.
+        new_in: 0.3.0
+      - id: ECOM-013
+        name: Internal search pages not indexable
+        scope: site
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: google
+        source: g_crawl_budget
+        test: Internal search result URLs are noindex or disallowed.
+        fix: Add noindex to search result templates.
+        new_in: 0.3.0
+      - id: ECOM-014
+        name: Product breadcrumbs
+        scope: page
+        method: crawl
+        severity: low
+        weight: 3
+        basis: google
+        source: g_sd_breadcrumb
+        test: Product pages show a breadcrumb to their category, marked up with BreadcrumbList.
+        fix: Add category breadcrumbs to the product template.
+        new_in: 0.3.0
+      - id: ECOM-015
+        name: Shipping, returns and payment pages
+        scope: site
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: google
+        source: g_qrg
+        test: Shipping, returns, payment and customer-service information is published and linked sitewide.
+        fix: Publish clear policy pages; they are trust requirements for shopping queries.
+        new_in: 0.3.0
+  - id: vertical.publisher
+    name: News & publishers
+    weight: 100
+    applicable_when: site type = news/publisher
+    subsections:
+    - id: vertical.publisher.core
+      name: News & publishers checks
+      weight: 100
+      note: Active only when site type = news/publisher
+      checks:
+      - id: NEWS-001
+        name: NewsArticle structured data
+        scope: page
+        method: crawl
+        severity: medium
+        weight: 5
+        basis: google
+        source: g_sd_article
+        test: Articles carry NewsArticle/Article with headline, image, datePublished, dateModified, author.
+        fix: Complete the article markup in the CMS template.
+        new_in: 0.3.0
+      - id: NEWS-002
+        name: Large image previews allowed
+        scope: page
+        method: crawl
+        severity: high
+        weight: 6
+        basis: google
+        source: g_discover
+        test: max-image-preview:large set (meta robots or header).
+        fix: Add max-image-preview:large to be eligible for large images in Discover.
+        new_in: 0.3.0
+      - id: NEWS-003
+        name: Lead images at least 1200 px wide
+        scope: page
+        method: crawl
+        severity: medium
+        weight: 5
+        basis: google
+        source: g_discover
+        test: Each article has an image >= 1200 px wide; the site logo is not used as the article image.
+        fix: Supply a large, relevant lead image per article.
+        new_in: 0.3.0
+      - id: NEWS-004
+        name: News sitemap
+        scope: site
+        method: crawl
+        severity: medium
+        weight: 5
+        basis: google
+        source: g_news_sitemap
+        test: A news sitemap lists articles from the last 2 days with publication name, language and publication
+          date.
+        fix: Generate a news sitemap that updates on publish.
+        new_in: 0.3.0
+      - id: NEWS-005
+        name: Bylines and dates on every article
+        scope: page
+        method: crawl
+        severity: high
+        weight: 6
+        basis: google
+        source: g_news_policies
+        test: Visible author byline and publication date/time on each article.
+        fix: Show byline and timestamps near the headline.
+        new_in: 0.3.0
+      - id: NEWS-006
+        name: Publisher transparency
+        scope: site
+        method: ai
+        severity: high
+        weight: 6
+        basis: google
+        source: g_news_policies
+        test: About, contact, editorial team and ownership/funding information published.
+        fix: Publish masthead, contact details and ownership information.
+        new_in: 0.3.0
+      - id: NEWS-007
+        name: Paywalled content markup
+        scope: page
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: google
+        source: g_paywall
+        test: Paywalled articles declare isAccessibleForFree=false with the paywalled section selector.
+        fix: Add the paywall markup so gated content is not treated as cloaking.
+        new_in: 0.3.0
+      - id: NEWS-008
+        name: Headlines match the content
+        scope: page
+        method: ai
+        severity: medium
+        weight: 5
+        basis: google
+        source: g_discover
+        test: Titles are accurate, not exaggerated or withholding key information.
+        fix: Rewrite misleading headlines; Discover policies exclude clickbait.
+        new_in: 0.3.0
+      - id: NEWS-009
+        name: Permanent, unique article URLs
+        scope: page
+        method: crawl
+        severity: low
+        weight: 3
+        basis: industry
+        source: g_url_structure
+        test: Each article has one stable URL that does not change after publication.
+        fix: Stop changing slugs after publish; redirect if unavoidable.
+        new_in: 0.3.0
+      - id: NEWS-010
+        name: Topic and section hubs
+        scope: site
+        method: crawl
+        severity: low
+        weight: 3
+        basis: industry
+        source: g_links
+        test: Sections/topics have crawlable hub pages linking recent and evergreen coverage.
+        fix: Create topic hubs and link them from articles.
+        new_in: 0.3.0
+  - id: vertical.saas
+    name: SaaS & software
+    weight: 100
+    applicable_when: site type = SaaS/software
+    subsections:
+    - id: vertical.saas.core
+      name: SaaS & software checks
+      weight: 100
+      note: Active only when site type = SaaS/software
+      checks:
+      - id: SAAS-001
+        name: Feature pages
+        scope: language
+        method: crawl
+        severity: medium
+        weight: 5
+        basis: industry
+        source: g_helpful
+        test: Each core feature has its own indexable page (not only a section of the homepage).
+        fix: Create one page per feature with use cases, screenshots and proof.
+        new_in: 0.3.0
+      - id: SAAS-002
+        name: Integration pages
+        scope: language
+        method: crawl
+        severity: medium
+        weight: 5
+        basis: industry
+        source: g_helpful
+        test: Each supported integration has a page describing what the connection does; no empty templated pages.
+        fix: Publish integration pages with real setup and use-case detail.
+        new_in: 0.3.0
+      - id: SAAS-003
+        name: Comparison pages
+        scope: language
+        method: ai
+        severity: medium
+        weight: 5
+        basis: industry
+        source: g_helpful
+        test: '''Brand vs competitor'' pages exist for main competitors and are factual and current.'
+        fix: Write fair comparison pages with verifiable feature and pricing facts.
+        new_in: 0.3.0
+      - id: SAAS-004
+        name: Alternatives pages
+        scope: language
+        method: ai
+        severity: medium
+        weight: 4
+        basis: industry
+        source: g_helpful
+        test: '''Alternatives to <competitor>'' pages exist for competitors with search demand.'
+        fix: Publish alternatives pages that include the honest trade-offs.
+        new_in: 0.3.0
+      - id: SAAS-005
+        name: Use-case and industry pages
+        scope: language
+        method: crawl
+        severity: medium
+        weight: 5
+        basis: industry
+        source: g_helpful
+        test: Dedicated pages per use case and per target industry, each with unique content.
+        fix: Build pages per segment; avoid swapping only the industry name.
+        new_in: 0.3.0
+      - id: SAAS-006
+        name: Pricing information (informational)
+        scope: site
+        method: crawl
+        severity: info
+        weight: 0
+        basis: industry
+        source: g_helpful
+        test: Reports whether a pricing page exists. Enterprise-only sales models may intentionally have none.
+        fix: 'Optional: publish how pricing works even without numbers.'
+        new_in: 0.3.0
+      - id: SAAS-007
+        name: Programmatic pages pass a quality gate
+        scope: language
+        method: ai
+        severity: high
+        weight: 7
+        basis: google
+        source: g_spam
+        test: Template-generated page sets have unique data per page and are not near-duplicates (scaled content
+          / doorway risk).
+        fix: Only generate pages where unique data exists; noindex or remove the rest.
+        new_in: 0.3.0
+      - id: SAAS-008
+        name: Free tools and linkable assets
+        scope: site
+        method: manual
+        severity: low
+        weight: 3
+        basis: industry
+        source: g_helpful
+        test: Site offers calculators, templates, free tools or original research that earn links.
+        fix: Build one tool or data asset aligned with the product.
+        new_in: 0.3.0
+      - id: SAAS-009
+        name: App, login and docs do not compete with marketing pages
+        scope: site
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: google
+        source: g_robots_meta
+        test: App/login/staging subdomains are noindex; help-centre articles do not outrank or duplicate product
+          pages.
+        fix: Noindex app surfaces and differentiate docs from marketing content.
+        new_in: 0.3.0
+      - id: SAAS-010
+        name: Product updates are published
+        scope: site
+        method: crawl
+        severity: low
+        weight: 2
+        basis: industry
+        source: g_dates
+        test: Changelog or release notes updated in the last 90 days.
+        fix: Publish release notes; they signal an active product.
+        new_in: 0.3.0
+  - id: vertical.services
+    name: Services & lead generation
+    weight: 100
+    applicable_when: site type = services (e.g. logistics, agencies, clinics)
+    subsections:
+    - id: vertical.services.core
+      name: Services & lead generation checks
+      weight: 100
+      note: Active only when site type = services (e.g. logistics, agencies, clinics)
+      checks:
+      - id: SERV-001
+        name: One page per service
+        scope: language
+        method: crawl
+        severity: high
+        weight: 7
+        basis: industry
+        source: g_helpful
+        test: Each service offered has a dedicated indexable page.
+        fix: Split combined service lists into individual service pages.
+        new_in: 0.3.0
+      - id: SERV-002
+        name: Service-area pages are unique
+        scope: language
+        method: ai
+        severity: high
+        weight: 6
+        basis: google
+        source: g_spam
+        test: City/area pages contain location-specific content, not the same text with the place name changed (doorway
+          pages).
+        fix: Add local proof (projects, coverage, team, pricing) or consolidate the pages.
+        new_in: 0.3.0
+      - id: SERV-003
+        name: Service structured data
+        scope: page
+        method: crawl
+        severity: low
+        weight: 3
+        basis: industry
+        source: g_sd_local
+        test: Service pages reference the business entity (LocalBusiness subtype or Service with provider and areaServed).
+        fix: Add Service markup linked to the organisation.
+        new_in: 0.3.0
+      - id: SERV-004
+        name: Licences and credentials shown
+        scope: site
+        method: ai
+        severity: medium
+        weight: 5
+        basis: google
+        source: g_qrg
+        test: Licences, certifications, insurance or memberships relevant to the service are displayed with issuer.
+        fix: Show credentials with numbers/links to the issuing body.
+        new_in: 0.3.0
+      - id: SERV-005
+        name: Clear conversion path on every service page
+        scope: page
+        method: crawl
+        severity: medium
+        weight: 5
+        basis: industry
+        source: g_helpful
+        test: Each service page has a visible quote/contact form or click-to-call/WhatsApp link.
+        fix: Add a primary enquiry action above the fold.
+        new_in: 0.3.0
+      - id: SERV-006
+        name: Service pages answer buying questions
+        scope: page
+        method: ai
+        severity: medium
+        weight: 5
+        basis: google
+        source: g_helpful
+        test: Pages explain process, coverage, timelines and pricing approach, with FAQs.
+        fix: Add the missing decision information listed per page.
+        new_in: 0.3.0
+      - id: SERV-007
+        name: Utility pages kept out of the index
+        scope: site
+        method: crawl
+        severity: medium
+        weight: 4
+        basis: google
+        source: g_robots_meta
+        test: Tracking, customer portal, login and thank-you pages are noindex.
+        fix: Add noindex to utility templates.
+        new_in: 0.3.0
+      - id: SERV-008
+        name: Proof per service
+        scope: language
+        method: ai
+        severity: medium
+        weight: 4
+        basis: google
+        source: g_qrg
+        test: Case studies or testimonials tied to each main service.
+        fix: Publish at least one case study per core service.
+        new_in: 0.3.0
+sources:
+  g_search_essentials:
+    title: Google Search Essentials
+    url: https://developers.google.com/search/docs/essentials
+  g_seo_starter:
+    title: SEO Starter Guide
+    url: https://developers.google.com/search/docs/fundamentals/seo-starter-guide
+  g_helpful:
+    title: Creating helpful, reliable, people-first content
+    url: https://developers.google.com/search/docs/fundamentals/creating-helpful-content
+  g_spam:
+    title: Spam policies for Google web search
+    url: https://developers.google.com/search/docs/essentials/spam-policies
+  g_qrg:
+    title: Search Quality Rater Guidelines
+    url: https://static.googleusercontent.com/media/guidelines.raterhub.com/en//searchqualityevaluatorguidelines.pdf
+  g_robots:
+    title: Introduction to robots.txt
+    url: https://developers.google.com/search/docs/crawling-indexing/robots/intro
+  g_robots_meta:
+    title: Robots meta tag, data-nosnippet and X-Robots-Tag
+    url: https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag
+  g_sitemap_build:
+    title: Build and submit a sitemap
+    url: https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap
+  g_http:
+    title: How HTTP status codes and network errors affect Google Search
+    url: https://developers.google.com/search/docs/crawling-indexing/http-network-errors
+  g_redirects:
+    title: Redirects and Google Search
+    url: https://developers.google.com/search/docs/crawling-indexing/301-redirects
+  g_links:
+    title: Link best practices for Google
+    url: https://developers.google.com/search/docs/crawling-indexing/links-crawlable
+  g_qualify_links:
+    title: Qualify your outbound links
+    url: https://developers.google.com/search/docs/crawling-indexing/qualify-outbound-links
+  g_canonical:
+    title: How to specify a canonical URL
+    url: https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls
+  g_url_structure:
+    title: URL structure best practices
+    url: https://developers.google.com/search/docs/crawling-indexing/url-structure
+  g_crawl_budget:
+    title: Managing crawl budget for large sites
+    url: https://developers.google.com/search/docs/crawling-indexing/large-site-managing-crawl-budget
+  g_pagination:
+    title: Pagination, incremental page loading and Google
+    url: https://developers.google.com/search/docs/specialty/ecommerce/pagination-and-incremental-page-loading
+  g_js:
+    title: JavaScript SEO basics
+    url: https://developers.google.com/search/docs/crawling-indexing/javascript/javascript-seo-basics
+  g_lazy:
+    title: Fix lazy-loaded content
+    url: https://developers.google.com/search/docs/crawling-indexing/javascript/lazy-loading
+  g_mobile_first:
+    title: Mobile-first indexing best practices
+    url: https://developers.google.com/search/docs/crawling-indexing/mobile/mobile-sites-mobile-first-indexing
+  g_page_exp:
+    title: Understanding page experience
+    url: https://developers.google.com/search/docs/appearance/page-experience
+  g_cwv:
+    title: Core Web Vitals and Google Search
+    url: https://developers.google.com/search/docs/appearance/core-web-vitals
+  g_hreflang:
+    title: Tell Google about localized versions of your page
+    url: https://developers.google.com/search/docs/specialty/international/localized-versions
+  g_multiregional:
+    title: Managing multi-regional and multilingual sites
+    url: https://developers.google.com/search/docs/specialty/international/managing-multi-regional-sites
+  g_title:
+    title: Influencing title links
+    url: https://developers.google.com/search/docs/appearance/title-link
+  g_snippet:
+    title: Control your snippets in search results
+    url: https://developers.google.com/search/docs/appearance/snippet
+  g_favicon:
+    title: Define a favicon to show in search results
+    url: https://developers.google.com/search/docs/appearance/favicon-in-search
+  g_site_names:
+    title: Provide a site name to Google Search
+    url: https://developers.google.com/search/docs/appearance/site-names
+  g_dates:
+    title: Influence the byline date in Google Search
+    url: https://developers.google.com/search/docs/appearance/publication-dates
+  g_images:
+    title: Google image SEO best practices
+    url: https://developers.google.com/search/docs/appearance/google-images
+  g_video:
+    title: Video SEO best practices
+    url: https://developers.google.com/search/docs/appearance/video
+  g_ai_features:
+    title: AI features and your website
+    url: https://developers.google.com/search/docs/appearance/ai-features
+  g_crawlers:
+    title: Google's common crawlers (incl. Google-Extended)
+    url: https://developers.google.com/search/docs/crawling-indexing/google-common-crawlers
+  g_sd_intro:
+    title: Introduction to structured data
+    url: https://developers.google.com/search/docs/appearance/structured-data/intro-structured-data
+  g_sd_policies:
+    title: General structured data guidelines
+    url: https://developers.google.com/search/docs/appearance/structured-data/sd-policies
+  g_sd_org:
+    title: Organization structured data
+    url: https://developers.google.com/search/docs/appearance/structured-data/organization
+  g_sd_article:
+    title: Article structured data
+    url: https://developers.google.com/search/docs/appearance/structured-data/article
+  g_sd_breadcrumb:
+    title: Breadcrumb structured data
+    url: https://developers.google.com/search/docs/appearance/structured-data/breadcrumb
+  g_sd_local:
+    title: Local business structured data
+    url: https://developers.google.com/search/docs/appearance/structured-data/local-business
+  g_sd_faq:
+    title: FAQPage structured data (rich result retired May 2026)
+    url: https://developers.google.com/search/docs/appearance/structured-data/faqpage
+  g_sd_qapage:
+    title: Q&A structured data
+    url: https://developers.google.com/search/docs/appearance/structured-data/qapage
+  gbp_guidelines:
+    title: Guidelines for representing your business on Google
+    url: https://support.google.com/business/answer/3038177
+  gbp_ranking:
+    title: Tips to improve your local ranking on Google
+    url: https://support.google.com/business/answer/7091
+  openai_bots:
+    title: Overview of OpenAI crawlers
+    url: https://platform.openai.com/docs/bots
+  perplexity_bots:
+    title: Perplexity crawlers
+    url: https://docs.perplexity.ai/guides/bots
+  anthropic_bots:
+    title: Anthropic crawlers
+    url: https://support.claude.com/en/articles/8896518
+  bing_guidelines:
+    title: Bing Webmaster Guidelines
+    url: https://www.bing.com/webmasters/help/webmaster-guidelines-30fba23a
+  llmstxt:
+    title: llms.txt proposal
+    url: https://llmstxt.org
+  openpagerank:
+    title: Open PageRank
+    url: https://www.domcop.com/openpagerank/
+  commoncrawl:
+    title: Common Crawl web graphs
+    url: https://commoncrawl.org/web-graphs
+  ogp:
+    title: The Open Graph protocol
+    url: https://ogp.me
+  x_cards:
+    title: X Cards markup
+    url: https://developer.x.com/en/docs/x-for-websites/cards/overview/markup
+  mdn_hsts:
+    title: Strict-Transport-Security (MDN)
+    url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security
+  w3c_lang:
+    title: 'W3C: Declaring language in HTML'
+    url: https://www.w3.org/International/questions/qa-html-language-declarations
+  g_safebrowsing:
+    title: Google Safe Browsing
+    url: https://developers.google.com/safe-browsing
+  g_gsc:
+    title: Search Console Help
+    url: https://support.google.com/webmasters
+  g_manual_actions:
+    title: Manual actions report
+    url: https://support.google.com/webmasters/answer/9044175
+  g_ai_content:
+    title: Google Search's guidance about AI-generated content
+    url: https://developers.google.com/search/blog/2023/02/google-search-and-ai-content
+  g_sd_review:
+    title: Review snippet structured data (self-serving reviews)
+    url: https://developers.google.com/search/docs/appearance/structured-data/review-snippet
+  g_sd_job:
+    title: Job posting structured data
+    url: https://developers.google.com/search/docs/appearance/structured-data/job-posting
+  g_sd_software:
+    title: Software app structured data
+    url: https://developers.google.com/search/docs/appearance/structured-data/software-app
+  g_knowledge_panel:
+    title: About knowledge panels
+    url: https://support.google.com/knowledgepanel/answer/9163198
+  g_featured:
+    title: Featured snippets and your website
+    url: https://developers.google.com/search/docs/appearance/featured-snippets
+  indexnow:
+    title: IndexNow
+    url: https://www.indexnow.org
+  wikidata:
+    title: Wikidata
+    url: https://www.wikidata.org
+  ai_bots_misc:
+    title: Applebot documentation
+    url: https://support.apple.com/en-us/119829
+  bing_places:
+    title: Bing Places for Business
+    url: https://www.bingplaces.com
+  g_sd_product:
+    title: Product structured data
+    url: https://developers.google.com/search/docs/appearance/structured-data/product
+  g_sd_merchant:
+    title: Merchant listing structured data
+    url: https://developers.google.com/search/docs/appearance/structured-data/merchant-listing
+  g_sd_variants:
+    title: Product variant structured data
+    url: https://developers.google.com/search/docs/appearance/structured-data/product-variants
+  g_ecom:
+    title: Best practices for ecommerce in Search
+    url: https://developers.google.com/search/docs/specialty/ecommerce
+  g_faceted:
+    title: Managing crawling of faceted navigation URLs
+    url: https://developers.google.com/search/docs/crawling-indexing/crawling-managing-faceted-navigation
+  gmc:
+    title: Google Merchant Center Help
+    url: https://support.google.com/merchants
+  g_discover:
+    title: Discover and your website
+    url: https://developers.google.com/search/docs/appearance/google-discover
+  g_news_sitemap:
+    title: News sitemaps
+    url: https://developers.google.com/search/docs/crawling-indexing/sitemaps/news-sitemap
+  g_news_policies:
+    title: Google News policies
+    url: https://support.google.com/news/publisher-center/answer/6204050
+  g_paywall:
+    title: Subscription and paywalled content
+    url: https://developers.google.com/search/docs/appearance/structured-data/paywalled-content
