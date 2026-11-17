@@ -1,6 +1,6 @@
 # Checks Catalog
 
-Version 0.4.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit by hand)
+Version 0.5.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit by hand)
 
 ## Summary
 
@@ -199,7 +199,7 @@ Version 0.4.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 - **Fix:** Remove the URL from the sitemap or lift the Disallow; conflicting signals waste crawl.
 
 **TECH-017 · robots.txt within size limit**  
-`low` · weight 2 · scope: site · method: crawl · Google official: [Introduction to robots.txt](https://developers.google.com/search/docs/crawling-indexing/robots/intro)
+`low` · weight 2 · scope: site · method: crawl · Industry practice: [Introduction to robots.txt](https://developers.google.com/search/docs/crawling-indexing/robots/intro)
 
 - **Test:** robots.txt <= 500 KiB (Google ignores content after the limit).
 - **Fix:** Consolidate rules; use path patterns instead of listing URLs.
@@ -357,7 +357,7 @@ Version 0.4.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 #### Mobile — 8% of Technical SEO
 
 **TECH-050 · Viewport meta tag**  
-`high` · weight 6 · scope: page · method: crawl · Google official: [Mobile-first indexing best practices](https://developers.google.com/search/docs/crawling-indexing/mobile/mobile-sites-mobile-first-indexing)
+`high` · weight 6 · scope: page · method: crawl · Industry practice: [Mobile-first indexing best practices](https://developers.google.com/search/docs/crawling-indexing/mobile/mobile-sites-mobile-first-indexing)
 
 - **Test:** <meta name='viewport' content='width=device-width, initial-scale=1'> present.
 - **Fix:** Add the viewport tag to the base template.
@@ -383,9 +383,9 @@ Version 0.4.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 #### Security — 9% of Technical SEO
 
 **TECH-060 · HTTPS on all pages**  
-`critical` · weight 8 · scope: site · method: crawl · Google official: [Understanding page experience](https://developers.google.com/search/docs/appearance/page-experience)
+`high` · weight 8 · scope: site · method: crawl · Google official: [Understanding page experience](https://developers.google.com/search/docs/appearance/page-experience)
 
-- **Test:** All pages served over HTTPS with a valid, non-expired certificate.
+- **Test:** All pages served over HTTPS with a valid certificate. Google lists secure serving as one aspect of page experience, which is one of many signals, not a requirement for indexing.
 - **Fix:** Install/renew the certificate and 301 all http URLs to https.
 
 **TECH-061 · No mixed content**  
@@ -509,10 +509,10 @@ Version 0.4.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 - **Fix:** Set long cache lifetimes with versioned file names.
 
 **TECH-092 · HTML size within Googlebot limit**  
-`medium` · weight 3 · scope: page · method: crawl · Google official: [Google's common crawlers (incl. Google-Extended)](https://developers.google.com/search/docs/crawling-indexing/google-common-crawlers)
+`high` · weight 3 · scope: page · method: crawl · Google official: [What is Googlebot](https://developers.google.com/search/docs/crawling-indexing/googlebot)
 
-- **Test:** Each HTML file < 15 MB (Googlebot indexes only the first 15 MB); > 2 MB = warn.
-- **Fix:** Move inline data/scripts out of the HTML.
+- **Test:** Each HTML file is under 2 MB. Google's Googlebot documentation states a 2 MB fetch limit for HTML; content beyond it is not considered. Over 1 MB = warn, over 2 MB = fail.
+- **Fix:** Reduce the HTML size: move inline scripts, styles and data out of the document so the main content sits within the first 2 MB.
 
 **TECH-093 · HTTP/2 or HTTP/3**  
 `low` · weight 1 · scope: site · method: crawl · Industry practice: [Managing crawl budget for large sites](https://developers.google.com/search/docs/crawling-indexing/large-site-managing-crawl-budget)
@@ -637,13 +637,13 @@ Version 0.4.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 **META-030 · Favicon eligible for Search**  
 `low` · weight 2 · scope: site · method: crawl · Google official: [Define a favicon to show in search results](https://developers.google.com/search/docs/appearance/favicon-in-search)
 
-- **Test:** <link rel='icon'> on the homepage, square, multiple of 48 px, crawlable.
+- **Test:** A favicon link (rel icon, apple-touch-icon or apple-touch-icon-precomposed) in the head of the home page; the icon must be square and at least 8x8 px (Google recommends larger than 48x48 px), and both the home page and the icon file must be crawlable.
 - **Fix:** Provide a 48x48 (or 96/144) square favicon referenced from the homepage head.
 
 **META-031 · Site name declared**  
 `low` · weight 2 · scope: site · method: crawl · Google official: [Provide a site name to Google Search](https://developers.google.com/search/docs/appearance/site-names)
 
-- **Test:** WebSite structured data with name (and alternateName) on the homepage.
+- **Test:** WebSite structured data with name and url (optionally alternateName) on the home page. This states a preference; Google may also use og:site_name, the title and headings.
 - **Fix:** Add WebSite JSON-LD with the brand name in each language version's homepage.
 
 **META-007 · Titles differ between language versions**  
@@ -705,7 +705,7 @@ Version 0.4.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 - **Fix:** State the topic early and remove sections that serve a different intent (move them to their own page).
 
 **CONT-004 · Keyword repetition**  
-`medium` · weight 5 · scope: page · method: crawl · Google official: [Spam policies for Google web search](https://developers.google.com/search/docs/essentials/spam-policies)
+`medium` · weight 5 · scope: page · method: crawl · Industry practice: [Spam policies for Google web search](https://developers.google.com/search/docs/essentials/spam-policies)
 
 - **Test:** No single non-stop-word term above 5% of the main content. Reported as a warning to review, since density alone does not prove stuffing.
 - **Fix:** Review the listed pages and rewrite unnaturally repeated phrases; use natural synonyms and remove keyword lists.
@@ -791,9 +791,9 @@ Version 0.4.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 - **Fix:** Display 'Published' and 'Updated' dates and keep them consistent with the structured data.
 
 **BLOG-004 · Article/BlogPosting schema complete**  
-`medium` · weight 5 · scope: page · method: crawl · applies to: blog · Google official: [Article structured data](https://developers.google.com/search/docs/appearance/structured-data/article)
+`low` · weight 5 · scope: page · method: crawl · applies to: blog · Google official: [Article structured data](https://developers.google.com/search/docs/appearance/structured-data/article)
 
-- **Test:** headline, image, datePublished, dateModified, author (Person with name + url) present and valid.
+- **Test:** Article/BlogPosting markup with the properties Google recommends: headline, image, datePublished, dateModified, author (name and url). Google lists no required properties.
 - **Fix:** Complete the missing properties listed per post.
 
 **BLOG-005 · Contextual links to commercial pages**  
@@ -929,27 +929,27 @@ Version 0.4.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 - **Fix:** Remove markup describing content users cannot see; this violates Google's structured-data policies.
 
 **SD-003 · Organization on homepage**  
-`medium` · weight 5 · scope: site · method: crawl · Google official: [Organization structured data](https://developers.google.com/search/docs/appearance/structured-data/organization)
+`low` · weight 3 · scope: site · method: crawl · Google official: [Organization structured data](https://developers.google.com/search/docs/appearance/structured-data/organization)
 
-- **Test:** Organization (or subtype) with name, url, logo; recommended: sameAs, address, contactPoint, foundingDate.
+- **Test:** Organization markup on the home page (or the about page). Google lists no required properties; name, url and logo are recommended, and the logo must be at least 112x112 px.
 - **Fix:** Complete the Organization JSON-LD (see GEO-020 for entity-level detail).
 
 **SD-004 · BreadcrumbList**  
-`low` · weight 3 · scope: page · method: crawl · Google official: [Breadcrumb structured data](https://developers.google.com/search/docs/appearance/structured-data/breadcrumb)
+`low` · weight 3 · scope: page · method: crawl · Industry practice: [Breadcrumb structured data](https://developers.google.com/search/docs/appearance/structured-data/breadcrumb)
 
 - **Test:** Non-home pages carry BreadcrumbList matching the visible breadcrumb trail.
 - **Fix:** Add BreadcrumbList generated from the site hierarchy.
 
 **SD-005 · Page-type schema present**  
-`medium` · weight 4 · scope: page · method: crawl · Google official: [Introduction to structured data](https://developers.google.com/search/docs/appearance/structured-data/intro-structured-data)
+`medium` · weight 4 · scope: page · method: crawl · Industry practice: [Introduction to structured data](https://developers.google.com/search/docs/appearance/structured-data/intro-structured-data)
 
 - **Test:** Blog -> Article/BlogPosting; product -> SoftwareApplication/Product; contact -> Organization contactPoint; video -> VideoObject.
 - **Fix:** Add the type mapped to each page group.
 
 **SD-006 · Deprecated or non-rendering types**  
-`info` · weight 0 · scope: page · method: crawl · Google official: [FAQPage structured data (rich result retired May 2026)](https://developers.google.com/search/docs/appearance/structured-data/faqpage)
+`info` · weight 0 · scope: page · method: crawl · Google official: [Search documentation updates: removing FAQ rich result](https://developers.google.com/search/updates#removing-faq-rich-result)
 
-- **Test:** Reports FAQPage (no Google rich result since 7 May 2026), HowTo (removed 2023) and other retired features. Informational: markup is still parsed for understanding.
+- **Test:** Reports pages using FAQPage or HowTo markup. Google's documentation updates state FAQ rich results are no longer shown as of 7 May 2026.
 - **Fix:** No removal needed. Do not count on these for SERP enhancements; keep only if the content is genuinely Q&A.
 
 **SD-007 · Logo meets requirements**  
@@ -1178,9 +1178,9 @@ Version 0.4.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 #### Entity clarity — 100% of Brand entity
 
 **GEO-020 · Complete Organization entity**  
-`high` · weight 7 · scope: site · method: crawl · Google official: [Organization structured data](https://developers.google.com/search/docs/appearance/structured-data/organization)
+`medium` · weight 7 · scope: site · method: crawl · Google official: [Organization structured data](https://developers.google.com/search/docs/appearance/structured-data/organization)
 
-- **Test:** Organization JSON-LD with name, alternateName (other-language name), url, logo, description, foundingDate, address, contactPoint, sameAs (>= 3 authoritative profiles).
+- **Test:** Organization JSON-LD carries the properties Google recommends: name, alternateName, url, logo, description, foundingDate, address, contactPoint, sameAs. None is required by Google.
 - **Fix:** Complete the missing properties; use the same @id across both language versions.
 
 **GEO-021 · sameAs to authoritative profiles**  
@@ -1224,7 +1224,7 @@ Version 0.4.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 #### Trust signals — 100% of E-E-A-T & trust
 
 **GEO-030 · Contact transparency**  
-`high` · weight 6 · scope: site · method: crawl · Google official: [Search Quality Rater Guidelines](https://static.googleusercontent.com/media/guidelines.raterhub.com/en//searchqualityevaluatorguidelines.pdf)
+`high` · weight 6 · scope: site · method: crawl · Industry practice: [Search Quality Rater Guidelines](https://static.googleusercontent.com/media/guidelines.raterhub.com/en//searchqualityevaluatorguidelines.pdf)
 
 - **Test:** Contact page with email/phone/address, linked sitewide.
 - **Fix:** Add complete contact details and link the page from the footer.
@@ -1242,7 +1242,7 @@ Version 0.4.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 - **Fix:** Display each credential with a link to the issuing body or article.
 
 **GEO-033 · Editorial and policy pages**  
-`low` · weight 3 · scope: site · method: crawl · Google official: [Search Quality Rater Guidelines](https://static.googleusercontent.com/media/guidelines.raterhub.com/en//searchqualityevaluatorguidelines.pdf)
+`low` · weight 3 · scope: site · method: crawl · Industry practice: [Search Quality Rater Guidelines](https://static.googleusercontent.com/media/guidelines.raterhub.com/en//searchqualityevaluatorguidelines.pdf)
 
 - **Test:** Privacy policy, terms and (for content sites) editorial/AI-use policy reachable.
 - **Fix:** Publish and link the missing policies.
@@ -1425,7 +1425,7 @@ Version 0.4.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 - **Fix:** Present comparisons in a real HTML table.
 
 **AEO-006 · FAQ section on commercial pages**  
-`medium` · weight 4 · scope: page · method: crawl · applies to: solutions, products · Industry practice: [FAQPage structured data (rich result retired May 2026)](https://developers.google.com/search/docs/appearance/structured-data/faqpage)
+`medium` · weight 4 · scope: page · method: crawl · applies to: solutions, products · Industry practice: [Search documentation updates: removing FAQ rich result](https://developers.google.com/search/updates#removing-faq-rich-result)
 
 - **Test:** Visible FAQ block answering pre-sales questions. Scored as content; FAQPage markup itself earns no Google rich result.
 - **Fix:** Add a FAQ section covering objections and decision questions.
@@ -1630,7 +1630,7 @@ Version 0.4.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 **LOC-020 · LocalBusiness/Organization address markup**  
 `medium` · weight 6 · scope: site · method: crawl · Google official: [Local business structured data](https://developers.google.com/search/docs/appearance/structured-data/local-business)
 
-- **Test:** PostalAddress (streetAddress, addressLocality, addressCountry) and telephone in markup for each location.
+- **Test:** LocalBusiness markup with the properties Google requires (name, address); recommended: telephone, url, geo, openingHoursSpecification.
 - **Fix:** Add LocalBusiness (or Organization with location) per office.
 
 **LOC-021 · Geo coordinates and hours**  

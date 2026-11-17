@@ -21,7 +21,7 @@
 #   test       exact pass / warn / fail rule the engine applies
 #   fix        what the report tells the expert to do
 
-version: 0.4.0
+version: 0.5.0
 updated: 2026-11-11
 scoring:
   results:
@@ -74,6 +74,7 @@ pillars:
           crawling). 3xx chain > 5 hops = fail.
         fix: 'Serve robots.txt as text/plain with 200. If the server returns 5xx for it, fix the origin/CDN rule
           first: Google treats a persistent 5xx robots.txt as a full disallow.'
+        verified: '2026-11-17'
       - id: TECH-002
         name: robots.txt does not block important URLs
         scope: site
@@ -85,6 +86,7 @@ pillars:
         test: No URL in the sitemap or main navigation is disallowed for Googlebot.
         fix: Remove or narrow the Disallow rule that matches the listed URLs. Use noindex (not Disallow) for pages
           that must stay out of the index; a disallowed page cannot have its noindex read.
+        verified: '2026-11-17'
       - id: TECH-003
         name: robots.txt does not block CSS/JS/images
         scope: site
@@ -96,6 +98,7 @@ pillars:
         test: Rendering resources referenced by templates (CSS, JS, images, fonts) are not disallowed.
         fix: Allow the asset paths listed in the report. Google must fetch them to render the page as users see
           it.
+        verified: '2026-11-17'
       - id: TECH-004
         name: Sitemap declared in robots.txt
         scope: site
@@ -253,11 +256,14 @@ pillars:
         method: crawl
         severity: low
         weight: 2
-        basis: google
+        basis: industry
         source: g_robots
         test: robots.txt <= 500 KiB (Google ignores content after the limit).
         fix: Consolidate rules; use path patterns instead of listing URLs.
         new_in: 0.2.0
+        verified: '2026-11-17'
+        verified_note: The 500 KiB limit is not on Google's robots.txt introduction page; not yet confirmed on the
+          robots.txt specification page.
       - id: TECH-018
         name: No crawl traps
         scope: site
@@ -454,6 +460,7 @@ pillars:
         source: g_lazy
         test: Lazy-loaded images/sections load without scroll or interaction events (native loading=lazy or IntersectionObserver).
         fix: Use native loading='lazy' or IntersectionObserver; never require scroll/click to inject content.
+        verified: '2026-11-17'
     - id: seo.technical.performance
       name: Page experience & Core Web Vitals
       weight: 14
@@ -545,10 +552,12 @@ pillars:
         method: crawl
         severity: high
         weight: 6
-        basis: google
+        basis: industry
         source: g_mobile_first
         test: <meta name='viewport' content='width=device-width, initial-scale=1'> present.
         fix: Add the viewport tag to the base template.
+        verified: '2026-11-17'
+        verified_note: Google's mobile-first indexing page does not mention the viewport meta tag.
       - id: TECH-051
         name: Mobile/desktop content parity
         scope: page
@@ -560,6 +569,7 @@ pillars:
         test: Mobile render (Googlebot smartphone UA) contains the same main text, headings, structured data, images/alt
           and meta as desktop (>= 95% text match).
         fix: Google indexes the mobile version. Do not hide content, links or schema on mobile breakpoints.
+        verified: '2026-11-17'
       - id: TECH-052
         name: Structured data and meta on mobile
         scope: page
@@ -572,6 +582,7 @@ pillars:
           desktop.
         fix: Output the same head and markup on the mobile version.
         new_in: 0.2.0
+        verified: '2026-11-17'
       - id: TECH-053
         name: Mobile usability (lab)
         scope: page
@@ -591,12 +602,14 @@ pillars:
         name: HTTPS on all pages
         scope: site
         method: crawl
-        severity: critical
+        severity: high
         weight: 8
         basis: google
         source: g_page_exp
-        test: All pages served over HTTPS with a valid, non-expired certificate.
+        test: All pages served over HTTPS with a valid certificate. Google lists secure serving as one aspect of
+          page experience, which is one of many signals, not a requirement for indexing.
         fix: Install/renew the certificate and 301 all http URLs to https.
+        verified: '2026-11-17'
       - id: TECH-061
         name: No mixed content
         scope: page
@@ -607,6 +620,7 @@ pillars:
         source: g_page_exp
         test: No http:// subresources on https pages.
         fix: Update the listed asset URLs to https.
+        verified: '2026-11-17'
       - id: TECH-062
         name: HSTS header
         scope: site
@@ -827,13 +841,16 @@ pillars:
         name: HTML size within Googlebot limit
         scope: page
         method: crawl
-        severity: medium
+        severity: high
         weight: 3
         basis: google
-        source: g_crawlers
-        test: Each HTML file < 15 MB (Googlebot indexes only the first 15 MB); > 2 MB = warn.
-        fix: Move inline data/scripts out of the HTML.
+        source: g_googlebot
+        test: Each HTML file is under 2 MB. Google's Googlebot documentation states a 2 MB fetch limit for HTML;
+          content beyond it is not considered. Over 1 MB = warn, over 2 MB = fail.
+        fix: 'Reduce the HTML size: move inline scripts, styles and data out of the document so the main content
+          sits within the first 2 MB.'
         new_in: 0.2.0
+        verified: '2026-11-17'
       - id: TECH-093
         name: HTTP/2 or HTTP/3
         scope: site
@@ -1062,8 +1079,11 @@ pillars:
         weight: 2
         basis: google
         source: g_favicon
-        test: <link rel='icon'> on the homepage, square, multiple of 48 px, crawlable.
+        test: A favicon link (rel icon, apple-touch-icon or apple-touch-icon-precomposed) in the head of the home
+          page; the icon must be square and at least 8x8 px (Google recommends larger than 48x48 px), and both the
+          home page and the icon file must be crawlable.
         fix: Provide a 48x48 (or 96/144) square favicon referenced from the homepage head.
+        verified: '2026-11-17'
       - id: META-031
         name: Site name declared
         scope: site
@@ -1072,8 +1092,10 @@ pillars:
         weight: 2
         basis: google
         source: g_site_names
-        test: WebSite structured data with name (and alternateName) on the homepage.
+        test: WebSite structured data with name and url (optionally alternateName) on the home page. This states
+          a preference; Google may also use og:site_name, the title and headings.
         fix: Add WebSite JSON-LD with the brand name in each language version's homepage.
+        verified: '2026-11-17'
       - id: META-007
         name: Titles differ between language versions
         scope: project
@@ -1184,12 +1206,15 @@ pillars:
         method: crawl
         severity: medium
         weight: 5
-        basis: google
+        basis: industry
         source: g_spam
         test: No single non-stop-word term above 5% of the main content. Reported as a warning to review, since
           density alone does not prove stuffing.
         fix: Review the listed pages and rewrite unnaturally repeated phrases; use natural synonyms and remove keyword
           lists.
+        verified: '2026-11-17'
+        verified_note: Google's spam policies define keyword stuffing but give no density percentage; the 5% threshold
+          is a heuristic.
       - id: CONT-005
         name: No scaled low-value content
         scope: language
@@ -1201,6 +1226,7 @@ pillars:
         test: Detects groups of templated pages with near-identical text and little unique value (e.g. city/industry
           pages differing only by a name).
         fix: Add unique, substantive content per page or consolidate them.
+        verified: '2026-11-17'
       - id: CONT-006
         name: Spelling and grammar
         scope: page
@@ -1277,6 +1303,7 @@ pillars:
           Tabs/accordions are fine.
         fix: Remove the hidden text.
         new_in: 0.2.0
+        verified: '2026-11-17'
       - id: CONT-013
         name: AI-generated content level (informational)
         scope: page
@@ -1338,17 +1365,20 @@ pillars:
         source: g_dates
         test: A visible date near the title, consistent with datePublished/dateModified in schema.
         fix: Display 'Published' and 'Updated' dates and keep them consistent with the structured data.
+        verified: '2026-11-17'
       - id: BLOG-004
         name: Article/BlogPosting schema complete
         scope: page
         applies_to: blog
         method: crawl
-        severity: medium
+        severity: low
         weight: 5
         basis: google
         source: g_sd_article
-        test: headline, image, datePublished, dateModified, author (Person with name + url) present and valid.
+        test: 'Article/BlogPosting markup with the properties Google recommends: headline, image, datePublished,
+          dateModified, author (name and url). Google lists no required properties.'
         fix: Complete the missing properties listed per post.
+        verified: '2026-11-17'
       - id: BLOG-005
         name: Contextual links to commercial pages
         scope: page
@@ -1578,6 +1608,7 @@ pillars:
         source: g_sd_policies
         test: All JSON-LD parses; no missing required properties for the declared Google-supported types.
         fix: Fix the parse/validation errors listed (property and path).
+        verified: '2026-11-17'
       - id: SD-002
         name: Structured data matches visible content
         scope: page
@@ -1588,37 +1619,45 @@ pillars:
         source: g_sd_policies
         test: Marked-up facts (names, ratings, FAQs, prices, dates) appear in the visible page.
         fix: Remove markup describing content users cannot see; this violates Google's structured-data policies.
+        verified: '2026-11-17'
       - id: SD-003
         name: Organization on homepage
         scope: site
         method: crawl
-        severity: medium
-        weight: 5
+        severity: low
+        weight: 3
         basis: google
         source: g_sd_org
-        test: 'Organization (or subtype) with name, url, logo; recommended: sameAs, address, contactPoint, foundingDate.'
+        test: Organization markup on the home page (or the about page). Google lists no required properties; name,
+          url and logo are recommended, and the logo must be at least 112x112 px.
         fix: Complete the Organization JSON-LD (see GEO-020 for entity-level detail).
+        verified: '2026-11-17'
       - id: SD-004
         name: BreadcrumbList
         scope: page
         method: crawl
         severity: low
         weight: 3
-        basis: google
+        basis: industry
         source: g_sd_breadcrumb
         test: Non-home pages carry BreadcrumbList matching the visible breadcrumb trail.
         fix: Add BreadcrumbList generated from the site hierarchy.
+        verified: '2026-11-17'
+        verified_note: Breadcrumb markup is an optional Google feature (shown on desktop); its absence is not a
+          violation.
       - id: SD-005
         name: Page-type schema present
         scope: page
         method: crawl
         severity: medium
         weight: 4
-        basis: google
+        basis: industry
         source: g_sd_intro
         test: Blog -> Article/BlogPosting; product -> SoftwareApplication/Product; contact -> Organization contactPoint;
           video -> VideoObject.
         fix: Add the type mapped to each page group.
+        verified: '2026-11-17'
+        verified_note: Page-type structured data is optional; Google does not require it.
       - id: SD-006
         name: Deprecated or non-rendering types
         scope: page
@@ -1627,10 +1666,11 @@ pillars:
         weight: 0
         basis: google
         source: g_sd_faq
-        test: 'Reports FAQPage (no Google rich result since 7 May 2026), HowTo (removed 2023) and other retired
-          features. Informational: markup is still parsed for understanding.'
+        test: Reports pages using FAQPage or HowTo markup. Google's documentation updates state FAQ rich results
+          are no longer shown as of 7 May 2026.
         fix: No removal needed. Do not count on these for SERP enhancements; keep only if the content is genuinely
           Q&A.
+        verified: '2026-11-17'
       - id: SD-007
         name: Logo meets requirements
         scope: site
@@ -1642,6 +1682,7 @@ pillars:
         test: Organization logo >= 112x112 px, crawlable, on a plain background.
         fix: Provide a compliant logo URL.
         new_in: 0.2.0
+        verified: '2026-11-17'
       - id: SD-008
         name: No self-serving reviews
         scope: page
@@ -1789,6 +1830,7 @@ pillars:
         test: Flags sitewide footer links from unrelated sites, exact-match commercial anchors > 20% of anchors,
           links from known link networks.
         fix: Stop the paid/exchanged link practice; qualify sponsored links with rel='sponsored'.
+        verified: '2026-11-17'
       - id: OFF-006
         name: Unlinked brand mentions
         scope: site
@@ -2040,13 +2082,14 @@ pillars:
         name: Complete Organization entity
         scope: site
         method: crawl
-        severity: high
+        severity: medium
         weight: 7
         basis: google
         source: g_sd_org
-        test: Organization JSON-LD with name, alternateName (other-language name), url, logo, description, foundingDate,
-          address, contactPoint, sameAs (>= 3 authoritative profiles).
+        test: 'Organization JSON-LD carries the properties Google recommends: name, alternateName, url, logo, description,
+          foundingDate, address, contactPoint, sameAs. None is required by Google.'
         fix: Complete the missing properties; use the same @id across both language versions.
+        verified: '2026-11-17'
       - id: GEO-021
         name: sameAs to authoritative profiles
         scope: site
@@ -2126,10 +2169,13 @@ pillars:
         method: crawl
         severity: high
         weight: 6
-        basis: google
+        basis: industry
         source: g_qrg
         test: Contact page with email/phone/address, linked sitewide.
         fix: Add complete contact details and link the page from the footer.
+        verified: '2026-11-17'
+        verified_note: Source is the Search Quality Rater Guidelines, which describe quality evaluation and are
+          not ranking requirements.
       - id: GEO-031
         name: Evidence of experience
         scope: language
@@ -2156,10 +2202,13 @@ pillars:
         method: crawl
         severity: low
         weight: 3
-        basis: google
+        basis: industry
         source: g_qrg
         test: Privacy policy, terms and (for content sites) editorial/AI-use policy reachable.
         fix: Publish and link the missing policies.
+        verified: '2026-11-17'
+        verified_note: Source is the Search Quality Rater Guidelines, which describe quality evaluation and are
+          not ranking requirements.
       - id: GEO-034
         name: Author expertise on informational content
         scope: language
@@ -2851,8 +2900,10 @@ pillars:
         weight: 6
         basis: google
         source: g_sd_local
-        test: PostalAddress (streetAddress, addressLocality, addressCountry) and telephone in markup for each location.
+        test: 'LocalBusiness markup with the properties Google requires (name, address); recommended: telephone,
+          url, geo, openingHoursSpecification.'
         fix: Add LocalBusiness (or Organization with location) per office.
+        verified: '2026-11-17'
       - id: LOC-021
         name: Geo coordinates and hours
         scope: site
@@ -3575,8 +3626,8 @@ sources:
     title: Local business structured data
     url: https://developers.google.com/search/docs/appearance/structured-data/local-business
   g_sd_faq:
-    title: FAQPage structured data (rich result retired May 2026)
-    url: https://developers.google.com/search/docs/appearance/structured-data/faqpage
+    title: 'Search documentation updates: removing FAQ rich result'
+    url: https://developers.google.com/search/updates#removing-faq-rich-result
   g_sd_qapage:
     title: Q&A structured data
     url: https://developers.google.com/search/docs/appearance/structured-data/qapage
@@ -3688,3 +3739,6 @@ sources:
   g_paywall:
     title: Subscription and paywalled content
     url: https://developers.google.com/search/docs/appearance/structured-data/paywalled-content
+  g_googlebot:
+    title: What is Googlebot
+    url: https://developers.google.com/search/docs/crawling-indexing/googlebot

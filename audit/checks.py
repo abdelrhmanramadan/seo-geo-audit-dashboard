@@ -297,8 +297,9 @@ def _(c):
 
 @check("TECH-092")
 def _(c):
-    big = [it(p["url"], f"{round(p['bytes'] / 1e6, 1)} MB") for p in c.html if p["bytes"] > 2_000_000]
-    return R("pass" if not big else "fail" if any(p["bytes"] > 15_000_000 for p in c.html) else "warn", f"{len(big)} HTML file(s) over 2 MB" if big else "HTML sizes fine", big)
+    big = [it(p["url"], f"{round(p['bytes'] / 1e6, 2)} MB of HTML") for p in c.html if p["bytes"] > 1_000_000]
+    over = any(p["bytes"] > 2_000_000 for p in c.html)
+    return R("pass" if not big else "fail" if over else "warn", f"{len(big)} HTML file(s) over 1 MB" + (", some over Google's 2 MB limit" if over else "") if big else "all HTML files under 1 MB", big)
 
 
 @check("TECH-094")
