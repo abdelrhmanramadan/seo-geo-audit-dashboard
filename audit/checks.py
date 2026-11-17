@@ -155,9 +155,9 @@ def _(c):
 
 @check("TECH-010")
 def _(c):
-    bad = [it(u, f"{f['hops']} hops to {f['final']}") for u, f in c.site["fetches"].items() if f["hops"] >= 2 or f.get("error") in ("redirect loop", "too many redirects")]
-    worst = max([f["hops"] for f in c.site["fetches"].values()] or [0])
-    return R("pass" if not bad else "warn" if worst < 5 else "fail", f"{len(bad)} redirect chain(s)" if bad else "no redirect chains", bad)
+    bad = [it(u, f"{f['hops']} hops to {f['final']}" if f["hops"] else f.get("error")) for u, f in c.site["fetches"].items() if f["hops"] >= 2 or f.get("error") in ("redirect loop", "too many redirects")]
+    broken = any(f["hops"] > 10 or f.get("error") in ("redirect loop", "too many redirects") for f in c.site["fetches"].values())
+    return R("pass" if not bad else "fail" if broken else "warn", f"{len(bad)} redirect chain(s)" + (", including loops or chains over 10 hops" if broken else "") if bad else "no redirect chains", bad)
 
 
 @check("TECH-011")
@@ -441,11 +441,8 @@ def _(c):
     bad = []
     for p in c.html:
         u = urlparse(p["url"])
-        path = unquote(u.path)
-        if len(path) > 115:
-            bad.append(it(p["url"], f"path is {len(path)} characters"))
-        elif "_" in path:
-            bad.append(it(p["url"], "underscores in path"))
+        if "_" in unquote(u.path):
+            bad.append(it(p["url"], "underscores in path (Google recommends hyphens)"))
         elif re.search(r"(sessionid|sid|phpsessid)=", u.query, re.I):
             bad.append(it(p["url"], "session id in URL"))
     return rate(len(c.html), bad, "pages", "URLs readable")

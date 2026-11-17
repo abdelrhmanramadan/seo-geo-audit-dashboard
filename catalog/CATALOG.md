@@ -1,6 +1,6 @@
 # Checks Catalog
 
-Version 0.3.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit by hand)
+Version 0.4.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit by hand)
 
 ## Summary
 
@@ -151,7 +151,7 @@ Version 0.3.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 - **Fix:** Replace JS-only navigation with real anchor elements pointing to resolvable URLs.
 
 **TECH-009 · No broken internal links**  
-`high` · weight 7 · scope: page · method: crawl · Google official: [How HTTP status codes and network errors affect Google Search](https://developers.google.com/search/docs/crawling-indexing/http-network-errors)
+`high` · weight 7 · scope: page · method: crawl · Google official: [How HTTP status codes affect Google's crawlers](https://developers.google.com/crawling/docs/troubleshooting/http-status-codes)
 
 - **Test:** No internal link resolves to 4xx/5xx.
 - **Fix:** Update each broken link to the live URL, or 301 the dead URL to its closest equivalent. Report lists source page, anchor text and target.
@@ -159,7 +159,7 @@ Version 0.3.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 **TECH-010 · No redirect chains or loops**  
 `medium` · weight 4 · scope: site · method: crawl · Google official: [Redirects and Google Search](https://developers.google.com/search/docs/crawling-indexing/301-redirects)
 
-- **Test:** Every redirect resolves in 1 hop. 2-4 hops = warn, >= 5 hops or loop = fail.
+- **Test:** Every redirect resolves in 1 hop. 2 to 10 hops = warn (works, but wasteful). More than 10 hops or a loop = fail: Google's crawlers follow up to 10 redirect hops by default.
 - **Fix:** Point the first URL directly at the final destination.
 
 **TECH-011 · Internal links point to final URLs**  
@@ -169,13 +169,13 @@ Version 0.3.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 - **Fix:** Update internal links to the final destination URL to save crawl and avoid signal loss through hops.
 
 **TECH-012 · No server errors (5xx)**  
-`critical` · weight 8 · scope: site · method: crawl · Google official: [How HTTP status codes and network errors affect Google Search](https://developers.google.com/search/docs/crawling-indexing/http-network-errors)
+`critical` · weight 8 · scope: site · method: crawl · Google official: [How HTTP status codes affect Google's crawlers](https://developers.google.com/crawling/docs/troubleshooting/http-status-codes)
 
 - **Test:** No crawled URL returns 5xx.
 - **Fix:** Investigate origin logs for the listed URLs. Persistent 5xx reduces crawl rate and eventually drops URLs from the index.
 
 **TECH-013 · Real 404 status for missing pages (no soft 404)**  
-`medium` · weight 4 · scope: site · method: crawl · Google official: [How HTTP status codes and network errors affect Google Search](https://developers.google.com/search/docs/crawling-indexing/http-network-errors)
+`medium` · weight 4 · scope: site · method: crawl · Google official: [How HTTP status codes affect Google's crawlers](https://developers.google.com/crawling/docs/troubleshooting/http-status-codes)
 
 - **Test:** A random non-existent URL returns 404/410, not 200 or a redirect to the homepage.
 - **Fix:** Configure the CMS to return 404 for unknown paths with a helpful custom 404 template.
@@ -237,7 +237,7 @@ Version 0.3.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 - **Fix:** Add a self-referencing absolute canonical to every indexable template. Remove duplicate canonical tags.
 
 **TECH-022 · Canonical target is valid**  
-`high` · weight 7 · scope: page · method: crawl · Google official: [How to specify a canonical URL](https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls)
+`high` · weight 7 · scope: page · method: crawl · Industry practice: [How to specify a canonical URL](https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls)
 
 - **Test:** Canonical target returns 200, is indexable and is not itself canonicalised or redirected.
 - **Fix:** Point the canonical at the live, indexable preferred URL.
@@ -285,7 +285,7 @@ Version 0.3.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 - **Fix:** Noindex or remove thin archive pages.
 
 **TECH-029B · No conflicting robots directives**  
-`medium` · weight 4 · scope: page · method: crawl · Google official: [Robots meta tag, data-nosnippet and X-Robots-Tag](https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag)
+`medium` · weight 4 · scope: page · method: crawl · Industry practice: [Robots meta tag, data-nosnippet and X-Robots-Tag](https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag)
 
 - **Test:** No page has multiple robots meta tags/headers with contradictory values (Google applies the most restrictive).
 - **Fix:** Keep one robots directive per page.
@@ -429,19 +429,19 @@ Version 0.3.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 **TECH-072 · hreflang codes valid**  
 `medium` · weight 5 · scope: page · method: crawl · Google official: [Tell Google about localized versions of your page](https://developers.google.com/search/docs/specialty/international/localized-versions)
 
-- **Test:** Language in ISO 639-1, optional region in ISO 3166-1 alpha-2 (e.g. ar, ar-SA, en). Flags common errors such as en-UK or ar-AR.
+- **Test:** Language in ISO 639-1, optional script in ISO 15924, optional region in ISO 3166-1 alpha-2 (e.g. ar, ar-SA, zh-Hant). Flags common errors such as en-UK.
 - **Fix:** Replace the invalid codes listed in the report.
 
 **TECH-073 · hreflang targets are canonical and live**  
-`medium` · weight 5 · scope: page · method: crawl · Google official: [Tell Google about localized versions of your page](https://developers.google.com/search/docs/specialty/international/localized-versions)
+`medium` · weight 5 · scope: page · method: crawl · Industry practice: [Tell Google about localized versions of your page](https://developers.google.com/search/docs/specialty/international/localized-versions)
 
 - **Test:** Every hreflang URL returns 200, is indexable and is its own canonical.
 - **Fix:** Point hreflang only at the canonical URL of each version.
 
 **TECH-074 · x-default declared**  
-`low` · weight 2 · scope: page · method: crawl · Google official: [Tell Google about localized versions of your page](https://developers.google.com/search/docs/specialty/international/localized-versions)
+`low` · weight 1 · scope: page · method: crawl · Google official: [Tell Google about localized versions of your page](https://developers.google.com/search/docs/specialty/international/localized-versions)
 
-- **Test:** An x-default annotation exists for the language selector or default version.
+- **Test:** An x-default annotation exists. Google documents x-default as optional (recommended) for unmatched languages.
 - **Fix:** Add hreflang='x-default' pointing to the default (or language-selector) version.
 
 **TECH-075 · Every page has its counterpart in each language**  
@@ -482,10 +482,10 @@ Version 0.3.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 
 #### URL structure — 4% of Technical SEO
 
-**TECH-080 · Descriptive, readable URLs**  
+**TECH-080 · Readable URLs (hyphens, no session IDs)**  
 `low` · weight 4 · scope: page · method: crawl · Google official: [URL structure best practices](https://developers.google.com/search/docs/crawling-indexing/url-structure)
 
-- **Test:** Path uses words separated by hyphens, no session IDs, no underscores, <= 115 characters.
+- **Test:** Path uses hyphens rather than underscores to separate words, and no session IDs in the URL. Google states no URL length limit, so length is not checked.
 - **Fix:** Use short, descriptive hyphenated slugs; 301 old URLs when changing them.
 
 **TECH-081 · Lowercase URLs**  
@@ -521,7 +521,7 @@ Version 0.3.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 - **Fix:** Enable HTTP/2+ at the CDN.
 
 **TECH-094 · Availability during crawl**  
-`high` · weight 5 · scope: site · method: crawl · Google official: [How HTTP status codes and network errors affect Google Search](https://developers.google.com/search/docs/crawling-indexing/http-network-errors)
+`high` · weight 5 · scope: site · method: crawl · Google official: [How HTTP status codes affect Google's crawlers](https://developers.google.com/crawling/docs/troubleshooting/http-status-codes)
 
 - **Test:** Error/timeout rate < 1% across the crawl; DNS resolves consistently.
 - **Fix:** Investigate hosting capacity or rate limiting toward crawlers.
@@ -605,9 +605,9 @@ Version 0.3.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 - **Fix:** Google may rewrite titles that do not match the visible heading; align them.
 
 **META-010 · Meta description present**  
-`medium` · weight 5 · scope: page · method: crawl · Google official: [Control your snippets in search results](https://developers.google.com/search/docs/appearance/snippet)
+`low` · weight 3 · scope: page · method: crawl · Google official: [Control your snippets in search results](https://developers.google.com/search/docs/appearance/snippet)
 
-- **Test:** Non-empty meta description.
+- **Test:** Non-empty meta description. Google recommends page-specific descriptions and, at minimum, descriptions for the home page and popular pages; it does not require one on every page.
 - **Fix:** Write a page-specific description summarising the page's value.
 
 **META-011 · Meta description unique**  
@@ -997,7 +997,7 @@ Version 0.3.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 - **Fix:** Add or clarify the primary CTA.
 
 **UX-003 · Custom 404 helps users**  
-`low` · weight 2 · scope: site · method: crawl · Google official: [How HTTP status codes and network errors affect Google Search](https://developers.google.com/search/docs/crawling-indexing/http-network-errors)
+`low` · weight 2 · scope: site · method: crawl · Google official: [How HTTP status codes affect Google's crawlers](https://developers.google.com/crawling/docs/troubleshooting/http-status-codes)
 
 - **Test:** 404 page offers navigation/search back into the site.
 - **Fix:** Add links to main sections and search on the 404 template.

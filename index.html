@@ -290,7 +290,7 @@ async function viewResult(a) {
     return $("details", {}, $("summary", {}, $("span", { class: "tag t-" + c.severity }, c.severity), $("b", {}, c.name),
         $("span", { class: "tag " + (c.basis === "google" ? "t-google" : "t-info") }, c.basis === "google" ? "Google" : "Best practice"), $("span", { class: "mut" }, c.summary), c.count ? $("span", { class: "tag t-info" }, c.count + (c.count === 1 ? " URL" : " URLs")) : null),
       $("div", { class: "det" }, $("p", {}, $("b", {}, "How to fix: "), c.fix), $("p", { class: "mut" }, $("b", {}, "Rule: "), c.test),
-        $("p", { class: "mut" }, c.id + " · " + c.section_name + " / " + c.subsection_name + " · " + ({ google: "Google official", platform: "Platform official", industry: "Industry practice" })[c.basis] + ": ", $("a", { href: c.source_url, target: "_blank", rel: "noopener" }, c.source_title)),
+        $("p", { class: "mut" }, c.id + " · " + c.section_name + " / " + c.subsection_name + " · " + ({ google: "Google official", platform: "Platform official", industry: "Industry practice" })[c.basis] + ": ", $("a", { href: c.source_url, target: "_blank", rel: "noopener" }, c.source_title), c.verified ? ` · checked against the source page on ${c.verified}` : ""),
         urls ? $("div", { class: "urls" }, urls, c.count > c.items.length ? $("div", { class: "mut" }, `Showing ${c.items.length} of ${c.count}.`) : null) : null));
   }
   function drawIssues() {

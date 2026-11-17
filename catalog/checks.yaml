@@ -21,7 +21,7 @@
 #   test       exact pass / warn / fail rule the engine applies
 #   fix        what the report tells the expert to do
 
-version: 0.3.0
+version: 0.4.0
 updated: 2026-11-11
 scoring:
   results:
@@ -106,6 +106,7 @@ pillars:
         source: g_sitemap_build
         test: 'robots.txt contains at least one absolute Sitemap: directive.'
         fix: 'Add `Sitemap: https://<domain>/sitemap.xml` to robots.txt and submit the same URL in Search Console.'
+        verified: '2026-11-17'
       - id: TECH-005
         name: XML sitemap valid
         scope: site
@@ -117,6 +118,7 @@ pillars:
         test: Sitemap (or index) returns 200, parses as XML, uses absolute URLs, <= 50,000 URLs and <= 50 MB uncompressed
           per file.
         fix: Regenerate the sitemap from the CMS; split into a sitemap index if limits are exceeded.
+        verified: '2026-11-17'
       - id: TECH-006
         name: Sitemap contains only indexable canonical URLs
         scope: site
@@ -129,6 +131,7 @@ pillars:
           10% = fail.
         fix: Remove redirected, 404, noindex and canonicalised-away URLs from the sitemap. Listed in the report
           with the reason per URL.
+        verified: '2026-11-17'
       - id: TECH-007
         name: Sitemap lastmod is accurate
         scope: site
@@ -140,6 +143,7 @@ pillars:
         test: lastmod present and not identical for all URLs; not in the future.
         fix: Set lastmod to the date of the last significant content change. Google ignores lastmod when it is consistently
           unreliable.
+        verified: '2026-11-17'
       - id: TECH-008
         name: Internal links are crawlable <a href>
         scope: page
@@ -151,6 +155,7 @@ pillars:
         test: Navigation and in-content links use <a href='resolvable URL'>. Links that only exist as onclick/JS
           handlers or href='#' = fail.
         fix: Replace JS-only navigation with real anchor elements pointing to resolvable URLs.
+        verified: '2026-11-17'
       - id: TECH-009
         name: No broken internal links
         scope: page
@@ -162,6 +167,7 @@ pillars:
         test: No internal link resolves to 4xx/5xx.
         fix: Update each broken link to the live URL, or 301 the dead URL to its closest equivalent. Report lists
           source page, anchor text and target.
+        verified: '2026-11-17'
       - id: TECH-010
         name: No redirect chains or loops
         scope: site
@@ -170,8 +176,10 @@ pillars:
         weight: 4
         basis: google
         source: g_redirects
-        test: Every redirect resolves in 1 hop. 2-4 hops = warn, >= 5 hops or loop = fail.
+        test: 'Every redirect resolves in 1 hop. 2 to 10 hops = warn (works, but wasteful). More than 10 hops or
+          a loop = fail: Google''s crawlers follow up to 10 redirect hops by default.'
         fix: Point the first URL directly at the final destination.
+        verified: '2026-11-17'
       - id: TECH-011
         name: Internal links point to final URLs
         scope: page
@@ -193,6 +201,7 @@ pillars:
         test: No crawled URL returns 5xx.
         fix: Investigate origin logs for the listed URLs. Persistent 5xx reduces crawl rate and eventually drops
           URLs from the index.
+        verified: '2026-11-17'
       - id: TECH-013
         name: Real 404 status for missing pages (no soft 404)
         scope: site
@@ -203,6 +212,7 @@ pillars:
         source: g_http
         test: A random non-existent URL returns 404/410, not 200 or a redirect to the homepage.
         fix: Configure the CMS to return 404 for unknown paths with a helpful custom 404 template.
+        verified: '2026-11-17'
       - id: TECH-014
         name: Click depth
         scope: page
@@ -224,6 +234,7 @@ pillars:
         test: Every sitemap URL receives at least one internal link from a crawled page.
         fix: Link each orphan from its relevant hub (e.g. solution page -> related blog posts), or remove it from
           the sitemap if obsolete.
+        verified: '2026-11-17'
       - id: TECH-016
         name: Sitemap URLs not blocked by robots.txt
         scope: site
@@ -235,6 +246,7 @@ pillars:
         test: No sitemap URL is disallowed in robots.txt.
         fix: Remove the URL from the sitemap or lift the Disallow; conflicting signals waste crawl.
         new_in: 0.2.0
+        verified: '2026-11-17'
       - id: TECH-017
         name: robots.txt within size limit
         scope: site
@@ -295,6 +307,7 @@ pillars:
         test: Pages in the sitemap/navigation carry no noindex in meta robots or X-Robots-Tag.
         fix: Remove the noindex from the listed pages. Check both the HTML meta and the HTTP header (CDN/hosting
           rules often inject X-Robots-Tag).
+        verified: '2026-11-17'
       - id: TECH-021
         name: Canonical tag present
         scope: page
@@ -311,10 +324,12 @@ pillars:
         method: crawl
         severity: high
         weight: 7
-        basis: google
+        basis: industry
         source: g_canonical
         test: Canonical target returns 200, is indexable and is not itself canonicalised or redirected.
         fix: Point the canonical at the live, indexable preferred URL.
+        verified: '2026-11-17'
+        verified_note: Google's canonical page does not state this explicitly; it is a consistency best practice.
       - id: TECH-023
         name: Canonical signals are consistent
         scope: page
@@ -325,6 +340,7 @@ pillars:
         source: g_canonical
         test: Canonical, sitemap, hreflang and internal links all reference the same preferred URL.
         fix: Align the signals; conflicting signals let Google pick a different canonical than intended.
+        verified: '2026-11-17'
       - id: TECH-024
         name: Host and protocol consolidated
         scope: site
@@ -335,6 +351,7 @@ pillars:
         source: g_canonical
         test: http://, https://, www and non-www variants 301 to one preferred host.
         fix: Add 301 rules at the CDN/host so every variant lands on the single preferred https host.
+        verified: '2026-11-17'
       - id: TECH-025
         name: Trailing slash and case consistency
         scope: site
@@ -395,11 +412,13 @@ pillars:
         method: crawl
         severity: medium
         weight: 4
-        basis: google
+        basis: industry
         source: g_robots_meta
         test: No page has multiple robots meta tags/headers with contradictory values (Google applies the most restrictive).
         fix: Keep one robots directive per page.
         new_in: 0.2.0
+        verified: '2026-11-17'
+        verified_note: Not confirmed on Google's robots meta page during verification.
     - id: seo.technical.rendering
       name: JavaScript rendering
       weight: 9
@@ -636,6 +655,7 @@ pillars:
         test: Every page that has a counterpart in another configured language declares hreflang for all versions
           (HTML, header or sitemap).
         fix: Add hreflang annotations listing every language version, including the page itself.
+        verified: '2026-11-17'
       - id: TECH-071
         name: hreflang return links (reciprocity)
         scope: project
@@ -646,6 +666,7 @@ pillars:
         source: g_hreflang
         test: If A references B, B references A. Missing return link = fail for the pair.
         fix: Add the missing return annotation on the listed counterpart; Google ignores non-reciprocal hreflang.
+        verified: '2026-11-17'
       - id: TECH-072
         name: hreflang codes valid
         scope: page
@@ -654,29 +675,34 @@ pillars:
         weight: 5
         basis: google
         source: g_hreflang
-        test: Language in ISO 639-1, optional region in ISO 3166-1 alpha-2 (e.g. ar, ar-SA, en). Flags common errors
-          such as en-UK or ar-AR.
+        test: Language in ISO 639-1, optional script in ISO 15924, optional region in ISO 3166-1 alpha-2 (e.g. ar,
+          ar-SA, zh-Hant). Flags common errors such as en-UK.
         fix: Replace the invalid codes listed in the report.
+        verified: '2026-11-17'
       - id: TECH-073
         name: hreflang targets are canonical and live
         scope: page
         method: crawl
         severity: medium
         weight: 5
-        basis: google
+        basis: industry
         source: g_hreflang
         test: Every hreflang URL returns 200, is indexable and is its own canonical.
         fix: Point hreflang only at the canonical URL of each version.
+        verified: '2026-11-17'
+        verified_note: Google's hreflang page does not state that alternates must be canonical or indexable.
       - id: TECH-074
         name: x-default declared
         scope: page
         method: crawl
         severity: low
-        weight: 2
+        weight: 1
         basis: google
         source: g_hreflang
-        test: An x-default annotation exists for the language selector or default version.
+        test: An x-default annotation exists. Google documents x-default as optional (recommended) for unmatched
+          languages.
         fix: Add hreflang='x-default' pointing to the default (or language-selector) version.
+        verified: '2026-11-17'
       - id: TECH-075
         name: Every page has its counterpart in each language
         scope: project
@@ -750,15 +776,17 @@ pillars:
       weight: 4
       checks:
       - id: TECH-080
-        name: Descriptive, readable URLs
+        name: Readable URLs (hyphens, no session IDs)
         scope: page
         method: crawl
         severity: low
         weight: 4
         basis: google
         source: g_url_structure
-        test: Path uses words separated by hyphens, no session IDs, no underscores, <= 115 characters.
+        test: Path uses hyphens rather than underscores to separate words, and no session IDs in the URL. Google
+          states no URL length limit, so length is not checked.
         fix: Use short, descriptive hyphenated slugs; 301 old URLs when changing them.
+        verified: '2026-11-17'
       - id: TECH-081
         name: Lowercase URLs
         scope: page
@@ -828,6 +856,7 @@ pillars:
         test: Error/timeout rate < 1% across the crawl; DNS resolves consistently.
         fix: Investigate hosting capacity or rate limiting toward crawlers.
         new_in: 0.2.0
+        verified: '2026-11-17'
     - id: seo.technical.measurement
       name: Measurement & verification
       weight: 5
@@ -917,6 +946,7 @@ pillars:
         source: g_title
         test: Exactly one non-empty <title>.
         fix: Write a unique, descriptive title for each listed page.
+        verified: '2026-11-17'
       - id: META-002
         name: Title unique across the site
         scope: page
@@ -927,6 +957,7 @@ pillars:
         source: g_title
         test: No two indexable pages in the same language share a title.
         fix: Differentiate titles by the page's specific topic; groups of duplicates are listed.
+        verified: '2026-11-17'
       - id: META-003
         name: Title length
         scope: page
@@ -974,12 +1005,14 @@ pillars:
         name: Meta description present
         scope: page
         method: crawl
-        severity: medium
-        weight: 5
+        severity: low
+        weight: 3
         basis: google
         source: g_snippet
-        test: Non-empty meta description.
+        test: Non-empty meta description. Google recommends page-specific descriptions and, at minimum, descriptions
+          for the home page and popular pages; it does not require one on every page.
         fix: Write a page-specific description summarising the page's value.
+        verified: '2026-11-17'
       - id: META-011
         name: Meta description unique
         scope: page
@@ -990,6 +1023,7 @@ pillars:
         source: g_snippet
         test: No duplicate descriptions among indexable pages in the same language.
         fix: Rewrite duplicates so each reflects its page.
+        verified: '2026-11-17'
       - id: META-012
         name: Meta description length
         scope: page
@@ -1051,6 +1085,7 @@ pillars:
         test: Paired AR/EN pages do not share an identical (untranslated) title.
         fix: Translate the title of the listed pages.
         new_in: 0.2.0
+        verified: '2026-11-17'
       - id: META-013
         name: Description matches page language
         scope: page
@@ -1369,6 +1404,7 @@ pillars:
         source: g_sitemap_build
         test: Feed linked with <link rel='alternate' type='application/rss+xml'>.
         fix: Expose a feed; Google accepts RSS/Atom as a sitemap source for fresh URLs.
+        verified: '2026-11-17'
       - id: BLOG-010
         name: Category structure
         scope: site
@@ -1405,6 +1441,7 @@ pillars:
         source: g_images
         test: Content images have non-empty alt that is not a filename. Decorative images may use alt=''.
         fix: Write alt text describing each listed image in context.
+        verified: '2026-11-17'
       - id: IMG-002
         name: Descriptive file names
         scope: page
@@ -1415,6 +1452,7 @@ pillars:
         source: g_images
         test: File names are words, not IMG_1234 / random hashes.
         fix: Rename on upload to short descriptive names.
+        verified: '2026-11-17'
       - id: IMG-003
         name: Modern formats and sizing
         scope: page
@@ -1445,6 +1483,7 @@ pillars:
         source: g_images
         test: Important images use <img src> (not CSS backgrounds) and are not blocked by robots.txt.
         fix: Move content images from CSS backgrounds to <img> elements.
+        verified: '2026-11-17'
       - id: IMG-006
         name: Video discoverability
         scope: page
@@ -1466,6 +1505,7 @@ pillars:
         test: Images used as links have alt describing the destination (it is their anchor text).
         fix: Write alt describing the target page.
         new_in: 0.2.0
+        verified: '2026-11-17'
     - id: seo.onpage.internal_links
       name: Internal linking
       weight: 9
@@ -1481,6 +1521,7 @@ pillars:
         test: No in-content internal links with generic anchors ('click here', 'read more', 'اضغط هنا', 'اقرأ المزيد')
           or empty anchors.
         fix: Rewrite anchors to describe the target page.
+        verified: '2026-11-17'
       - id: LINK-002
         name: Adequate inbound internal links
         scope: page
@@ -1829,6 +1870,7 @@ pillars:
         test: 'Page indexable and snippet-eligible: no nosnippet, max-snippet:0, or data-nosnippet over main content.'
         fix: Remove the snippet restriction from the listed pages; AI Overviews only use content eligible for a
           snippet.
+        verified: '2026-11-17'
       - id: GEO-002
         name: OAI-SearchBot allowed (ChatGPT search)
         scope: site
@@ -2464,6 +2506,7 @@ pillars:
         source: g_robots_meta
         test: No max-snippet < 50, nosnippet or data-nosnippet on answer content.
         fix: Relax the snippet directive on the listed pages.
+        verified: '2026-11-17'
       - id: AEO-008
         name: Jump links to sections
         scope: page
@@ -3442,8 +3485,8 @@ sources:
     title: Build and submit a sitemap
     url: https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap
   g_http:
-    title: How HTTP status codes and network errors affect Google Search
-    url: https://developers.google.com/search/docs/crawling-indexing/http-network-errors
+    title: How HTTP status codes affect Google's crawlers
+    url: https://developers.google.com/crawling/docs/troubleshooting/http-status-codes
   g_redirects:
     title: Redirects and Google Search
     url: https://developers.google.com/search/docs/crawling-indexing/301-redirects

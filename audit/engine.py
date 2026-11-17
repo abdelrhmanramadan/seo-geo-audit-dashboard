@@ -56,7 +56,7 @@ def evaluate(site, intake, pages=None, with_items=True):
                     so = src[c["source"]]
                     checks.append({**{k: c[k] for k in ("id", "name", "severity", "weight", "basis", "method", "scope", "test", "fix")},
                                    "pillar": p["id"], "section": s["id"], "subsection": ss["id"], "section_name": s["name"], "subsection_name": ss["name"],
-                                   "source_title": so["title"], "source_url": so["url"], **res})
+                                   "source_title": so["title"], "source_url": so["url"], "verified": c.get("verified"), **res})
                 sc = wavg(scored)
                 if sc is not None and crit:
                     sc = min(sc, 60.0)
