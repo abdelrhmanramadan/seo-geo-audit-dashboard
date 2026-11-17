@@ -48,6 +48,8 @@ scoring:
     local: 20
     vertical: 15
   per_language: every score is computed per language version and for the project as a whole
+  basis_rule: Only checks with basis 'google' (documented in Google Search Central or Google help pages) count toward
+    scores. Checks with basis 'platform' or 'industry' are run and reported as best practice, unscored.
 pillars:
 - id: seo
   name: SEO
@@ -299,7 +301,7 @@ pillars:
         method: crawl
         severity: medium
         weight: 5
-        basis: google
+        basis: industry
         source: g_canonical
         test: Exactly one rel=canonical with an absolute URL in <head>.
         fix: Add a self-referencing absolute canonical to every indexable template. Remove duplicate canonical tags.
@@ -964,7 +966,7 @@ pillars:
         method: crawl
         severity: low
         weight: 3
-        basis: google
+        basis: industry
         source: g_title
         test: Title and H1 share the core topic (token overlap >= 50% after stop-word removal).
         fix: Google may rewrite titles that do not match the visible heading; align them.
@@ -1070,7 +1072,7 @@ pillars:
         method: crawl
         severity: high
         weight: 7
-        basis: google
+        basis: industry
         source: g_seo_starter
         test: At least one non-empty H1 in the main content.
         fix: Add a visible H1 stating the page topic.
@@ -1495,7 +1497,7 @@ pillars:
         method: crawl
         severity: low
         weight: 3
-        basis: google
+        basis: industry
         source: g_qualify_links
         test: Internal links do not carry rel=nofollow.
         fix: Remove nofollow from internal links.

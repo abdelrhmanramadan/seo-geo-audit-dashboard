@@ -46,9 +46,9 @@ def evaluate(site, intake, pages=None, with_items=True):
                         res = {"status": "not_run", "summary": WHY.get(c["method"], "not implemented yet"), "items": [], "count": 0}
                     if res["status"] in SCORE:
                         ran += 1
-                        if c["weight"]:
+                        if c["weight"] and c["basis"] == "google":  # only checks documented by Google count toward scores
                             scored.append((c["weight"], SCORE[res["status"]] * 100))
-                        crit |= res["status"] == "fail" and c["severity"] == "critical"
+                        crit |= res["status"] == "fail" and c["severity"] == "critical" and c["basis"] == "google"
                     elif res["status"] == "info":
                         ran += 1
                     if not with_items:

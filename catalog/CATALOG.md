@@ -22,6 +22,7 @@ Version 0.3.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 - **pillar score**: weighted average of its sections (section weights below)
 - **overall score**: weighted average of active pillars; N/A pillars (Local for non-local businesses, Site-type modules when none applies) are removed and the weights renormalised to 100
 - **per language**: every score is computed per language version and for the project as a whole
+- **basis rule**: Only checks with basis 'google' (documented in Google Search Central or Google help pages) count toward scores. Checks with basis 'platform' or 'industry' are run and reported as best practice, unscored.
 - **results**: pass = 1, warn = 0.5, fail = 0; N/A and info are excluded from the denominator
 
 ## Structure
@@ -230,7 +231,7 @@ Version 0.3.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 - **Fix:** Remove the noindex from the listed pages. Check both the HTML meta and the HTTP header (CDN/hosting rules often inject X-Robots-Tag).
 
 **TECH-021 · Canonical tag present**  
-`medium` · weight 5 · scope: page · method: crawl · Google official: [How to specify a canonical URL](https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls)
+`medium` · weight 5 · scope: page · method: crawl · Industry practice: [How to specify a canonical URL](https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls)
 
 - **Test:** Exactly one rel=canonical with an absolute URL in <head>.
 - **Fix:** Add a self-referencing absolute canonical to every indexable template. Remove duplicate canonical tags.
@@ -598,7 +599,7 @@ Version 0.3.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 - **Fix:** Normalise the suffix in the CMS template.
 
 **META-006 · Title aligns with H1**  
-`low` · weight 3 · scope: page · method: crawl · Google official: [Influencing title links](https://developers.google.com/search/docs/appearance/title-link)
+`low` · weight 3 · scope: page · method: crawl · Industry practice: [Influencing title links](https://developers.google.com/search/docs/appearance/title-link)
 
 - **Test:** Title and H1 share the core topic (token overlap >= 50% after stop-word removal).
 - **Fix:** Google may rewrite titles that do not match the visible heading; align them.
@@ -660,7 +661,7 @@ Version 0.3.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 #### Headings — 5% of On-page SEO
 
 **HEAD-001 · H1 present**  
-`high` · weight 7 · scope: page · method: crawl · Google official: [SEO Starter Guide](https://developers.google.com/search/docs/fundamentals/seo-starter-guide)
+`high` · weight 7 · scope: page · method: crawl · Industry practice: [SEO Starter Guide](https://developers.google.com/search/docs/fundamentals/seo-starter-guide)
 
 - **Test:** At least one non-empty H1 in the main content.
 - **Fix:** Add a visible H1 stating the page topic.
@@ -896,7 +897,7 @@ Version 0.3.0 · updated 2026-11-11 · generated from `checks.yaml` (do not edit
 - **Fix:** Add links from related pages; suggestions listed by topical similarity.
 
 **LINK-003 · No nofollow on internal links**  
-`low` · weight 3 · scope: page · method: crawl · Google official: [Qualify your outbound links](https://developers.google.com/search/docs/crawling-indexing/qualify-outbound-links)
+`low` · weight 3 · scope: page · method: crawl · Industry practice: [Qualify your outbound links](https://developers.google.com/search/docs/crawling-indexing/qualify-outbound-links)
 
 - **Test:** Internal links do not carry rel=nofollow.
 - **Fix:** Remove nofollow from internal links.
