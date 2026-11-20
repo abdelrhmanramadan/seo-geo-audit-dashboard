@@ -19,7 +19,10 @@ def one(url, key):
     except Exception as e:
         return url, {"error": type(e).__name__}
     out, src = {}, "url"
-    m = (j.get("loadingExperience") or {}).get("metrics") or {}
+    le = j.get("loadingExperience") or {}
+    m = le.get("metrics") or {}
+    if le.get("origin_fallback"):  # PSI puts origin data in loadingExperience when the URL has too little traffic
+        src = "origin"
     if not m:
         m, src = (j.get("originLoadingExperience") or {}).get("metrics") or {}, "origin"
 
@@ -28,7 +31,13 @@ def one(url, key):
     if m:
         cls = pct("CUMULATIVE_LAYOUT_SHIFT_SCORE")
         out.update(field=src, lcp_ms=pct("LARGEST_CONTENTFUL_PAINT_MS"), inp_ms=pct("INTERACTION_TO_NEXT_PAINT"), cls=cls / 100 if cls is not None else None)
-    cats = (j.get("lighthouseResult") or {}).get("categories") or {}
+    lh = j.get("lighthouseResult") or {}
+    au = lh.get("audits") or {}
+    for a, k in (("largest-contentful-paint", "lab_lcp_ms"), ("cumulative-layout-shift", "lab_cls"), ("total-blocking-time", "lab_tbt_ms")):
+        v = (au.get(a) or {}).get("numericValue")
+        if v is not None:
+            out[k] = v
+    cats = lh.get("categories") or {}
     for name, key2 in (("performance", "lab_performance"), ("accessibility", "lab_accessibility")):
         s = (cats.get(name) or {}).get("score")
         if s is not None:

@@ -332,7 +332,9 @@ def _psi(c):
     return {u: v for u, v in c.site["psi"].items() if u in mine} or c.site["psi"], None
 
 
-def _cwv(cid, key, good, poor, unit, label):
+def _cwv(cid, key, good, poor, unit, label, lab=None):
+    fmt = (lambda x: f"{x / 1000:.1f} s") if unit == "s" else (lambda x: f"{x:.0f} ms") if unit == "ms" else (lambda x: f"{x:.2f}")
+
     @check(cid)
     def _(c):
         data, miss = _psi(c)
@@ -340,16 +342,29 @@ def _cwv(cid, key, good, poor, unit, label):
             return miss
         rows = [(u, v) for u, v in data.items() if v.get(key) is not None]
         if not rows:
-            return R("na", "the Chrome UX Report has no real-user data for this site (not enough Chrome traffic)")
-        fmt = (lambda x: f"{x / 1000:.1f} s") if unit == "s" else (lambda x: f"{x:.0f} ms") if unit == "ms" else (lambda x: f"{x:.2f}")
-        bad = [it(u, f"{label} {fmt(v[key])} at the 75th percentile" + (" (origin-level data)" if v.get("field") == "origin" else "")) for u, v in rows if v[key] > good]
-        worst = max(v[key] for _, v in rows)
-        return R("pass" if not bad else "fail" if worst > poor else "warn", f"{len(bad)} of {len(rows)} sampled pages above Google's 'good' threshold; worst {fmt(worst)}" if bad else f"all {len(rows)} sampled pages are 'good' (worst {fmt(worst)})", bad)
+            labs = [(u, v[lab]) for u, v in data.items() if lab and v.get(lab) is not None]
+            note = "the Chrome UX Report has no real-user data for this site (not enough Chrome traffic), so Google has no Core Web Vitals to assess"
+            if labs:
+                note += f"; Lighthouse lab {label} on {len(labs)} sampled pages for reference, not a ranking signal: worst {fmt(max(x for _, x in labs))}"
+            return R("na", note, [it(u, f"lab {label} {fmt(x)}") for u, x in sorted(labs, key=lambda r: -r[1]) if x > good])
+        url_rows = [(u, v) for u, v in rows if v.get("field") != "origin"]
+        origin = next((v for _, v in rows if v.get("field") == "origin"), None)
+        bad = [it(u, f"{label} {fmt(v[key])} at the 75th percentile (this URL's own real-user data)") for u, v in url_rows if v[key] > good]
+        vals = [v[key] for _, v in url_rows]
+        if origin is not None:
+            vals.append(origin[key])
+            if origin[key] > good:
+                bad.insert(0, it(c.site["root"], f"{label} {fmt(origin[key])} at the 75th percentile for the whole origin; Google has no URL-level data for {len(rows) - len(url_rows)} of the sampled pages, so it uses this origin value for them"))
+        worst = max(vals)
+        scope = f"{len(url_rows)} page(s) with their own field data" + (", origin-level data for the rest" if origin is not None else "")
+        if not bad:
+            return R("pass", f"'good' everywhere (worst {fmt(worst)}); {scope}")
+        return R("fail" if worst > poor else "warn", f"above Google's 'good' threshold of {fmt(good)}; worst {fmt(worst)}; {scope}", bad)
 
 
-_cwv("TECH-040", "lcp_ms", 2500, 4000, "s", "LCP")
+_cwv("TECH-040", "lcp_ms", 2500, 4000, "s", "LCP", "lab_lcp_ms")
 _cwv("TECH-041", "inp_ms", 200, 500, "ms", "INP")
-_cwv("TECH-042", "cls", 0.1, 0.25, "", "CLS")
+_cwv("TECH-042", "cls", 0.1, 0.25, "", "CLS", "lab_cls")
 
 
 def _lab(cid, key, label):
@@ -368,6 +383,16 @@ def _lab(cid, key, label):
 
 _lab("TECH-043", "lab_performance", "Lighthouse performance")
 _lab("UX-001", "lab_accessibility", "Lighthouse accessibility")
+
+
+@check("AEO-009")
+def _(c):
+    vids = [p for p in c.html if any("VideoObject" in n["t"] for n in p.get("ld", []))]
+    if not vids:
+        return R("na", "no page carries VideoObject markup")
+    bad = [it(p["url"], "VideoObject without hasPart (Clip) or potentialAction (SeekToAction)") for p in vids
+           if not any("VideoObject" in n["t"] and ({"hasPart", "potentialAction"} & set(n["k"])) for n in p["ld"])]
+    return rate(len(vids), bad, "video pages", "key moments markup present")
 
 
 # ---------------- Technical: international ----------------

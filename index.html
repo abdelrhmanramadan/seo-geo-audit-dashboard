@@ -328,7 +328,8 @@ async function viewResult(a) {
     const grid = $("div", { class: "grid" });
     for (const p of r.scores.pillars) {
       if (p.score == null) continue;
-      const c = $("div", { class: "card", style: "margin:0" }, $("div", { style: "display:flex;justify-content:space-between" }, $("b", {}, p.name), $("span", { class: "score " + cls(p.score) }, fmt(p.score))));
+      const c = $("div", { class: "card", style: "margin:0" }, $("div", { style: "display:flex;justify-content:space-between" }, $("b", {}, p.name), $("span", { class: "score " + (p.low_confidence ? "s-na" : cls(p.score)) }, fmt(p.score))),
+        p.scored != null ? $("div", { class: "mut", style: "font-size:12px;margin:2px 0 6px" }, p.low_confidence ? `Based on only ${p.scored} Google-documented check${p.scored === 1 ? "" : "s"}, so not counted in the overall score yet.` : `Based on ${p.scored} Google-documented checks.`) : null);
       for (const s of p.sections.filter(s => s.score != null)) {
         c.append($("div", { class: "sub", style: "font-weight:600" }, $("span", {}, s.name), $("span", { class: cls(s.score) }, fmt(s.score))));
         for (const ss of s.subsections.filter(x => x.score != null)) c.append($("div", { class: "sub" }, $("span", {}, ss.name), $("span", { class: "mut" }, `${fmt(ss.score)} · ${ss.ran}/${ss.total} checks`)),

@@ -61,14 +61,16 @@ def evaluate(site, intake, pages=None, with_items=True):
                 if sc is not None and crit:
                     sc = min(sc, 60.0)
                 p_crit |= crit
-                subs.append({"id": ss["id"], "name": ss["name"], "weight": ss["weight"], "score": sc, "ran": ran, "total": len(ss["checks"])})
+                subs.append({"id": ss["id"], "name": ss["name"], "weight": ss["weight"], "score": sc, "ran": ran, "scored": len(scored), "total": len(ss["checks"])})
             sections.append({"id": s["id"], "name": s["name"], "weight": s["weight"], "active": s_active,
-                             "score": wavg([(x["weight"], x["score"]) for x in subs]), "subsections": subs})
+                             "score": wavg([(x["weight"], x["score"]) for x in subs]), "scored": sum(x["scored"] for x in subs), "subsections": subs})
         ps = wavg([(x["weight"], x["score"]) for x in sections])
         if ps is not None and p_crit:
             ps = min(ps, 75.0)
-        pillars.append({"id": p["id"], "name": p["name"].split(" (")[0], "weight": pw[p["id"]], "score": ps, "sections": sections})
-    return {"overall": wavg([(x["weight"], x["score"]) for x in pillars]), "pillars": pillars}, checks, ctx
+        n = sum(x["scored"] for x in sections)
+        pillars.append({"id": p["id"], "name": p["name"].split(" (")[0], "weight": pw[p["id"]], "score": ps, "scored": n,
+                        "low_confidence": ps is not None and n < 3, "sections": sections})
+    return {"overall": wavg([(x["weight"], x["score"]) for x in pillars if not x["low_confidence"]]), "pillars": pillars}, checks, ctx
 
 
 def audit(site, intake):
